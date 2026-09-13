@@ -5,16 +5,15 @@ Apprends Linux et la cybersécurité en jouant dans le terminal.
 ## Installation rapide
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/TON_GITHUB/hackquest/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/jordanwinner/hackquest/master/install.sh | bash
 ```
 
 Ou manuellement :
 
 ```bash
-git clone https://github.com/TON_GITHUB/hackquest.git
+git clone https://github.com/jordanwinner/hackquest.git
 cd hackquest
-chmod +x install.sh
-./install.sh
+bash install.sh
 ```
 
 ## Lancer le jeu
