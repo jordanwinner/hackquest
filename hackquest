@@ -1,0 +1,2 @@
+#!/bin/bash
+cd /home/jordan/CTF/misc/hackquest && python3 hackquest.py "$@"
