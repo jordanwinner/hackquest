@@ -22,6 +22,17 @@ bash install.sh
 hackquest
 ```
 
+## Contrôles
+
+| Touche / mot | Effet |
+|---|---|
+| `hint` | indice (-5 XP) |
+| `skip` | passer la mission |
+| `back`, `q` ou **Ctrl+C** | revenir en arrière |
+| **Ctrl+D** | quitter |
+
+La progression est enregistrée dans `~/.hackquest_save.json`. Une copie de la version précédente est gardée dans `~/.hackquest_save.json.bak` et sert automatiquement si la sauvegarde est abîmée.
+
 ## Ce que tu vas apprendre
 
 - 🐧 **Linux** : navigation, fichiers, permissions, processus, réseau, scripting, avancé

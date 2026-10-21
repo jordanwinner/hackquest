@@ -55,14 +55,16 @@ def strip_ansi(text):
     import re
     return re.sub(r'\033\[[0-9;]*m', '', text)
 
-def xp_bar(current_xp, next_xp, width=30):
+def xp_bar(current_xp, next_xp, width=30, level_xp=0):
+    """Progression dans le palier actuel (de level_xp à next_xp)."""
     if next_xp is None:
         bar = "█" * width
         return f"{GREEN}{bar}{RESET} MAX"
-    filled = int((current_xp / next_xp) * width)
+    ratio = (current_xp - level_xp) / (next_xp - level_xp)
+    ratio = min(1, max(0, ratio))
+    filled = int(ratio * width)
     bar = "█" * filled + "░" * (width - filled)
-    pct = int((current_xp / next_xp) * 100)
-    return f"{GREEN}{bar}{RESET} {pct}%"
+    return f"{GREEN}{bar}{RESET} {int(ratio * 100)}%"
 
 def success(msg):
     print(f"\n{GREEN}{BOLD}✅ {msg}{RESET}")
@@ -76,18 +78,28 @@ def info(msg):
 def warning(msg):
     print(f"\n{YELLOW}⚠  {msg}{RESET}")
 
+def _end_of_input():
+    """Ctrl+D ou entrée fermée : plus rien ne pourra être lu, on quitte proprement."""
+    print(f"\n{CYAN}  À bientôt ! Ta progression est sauvegardée.{RESET}\n")
+    sys.exit(0)
+
 def prompt(text=""):
+    """Ctrl+C renvoie "quit" (retour au menu précédent), Ctrl+D quitte le jeu."""
     try:
         return input(f"\n{MAGENTA}{BOLD}❯ {text}{RESET}").strip()
-    except (KeyboardInterrupt, EOFError):
+    except KeyboardInterrupt:
         print()
         return "quit"
+    except EOFError:
+        _end_of_input()
 
 def press_enter():
     try:
         input(f"\n{DIM}[Appuie sur Entrée pour continuer...]{RESET}")
-    except (KeyboardInterrupt, EOFError):
+    except KeyboardInterrupt:
         pass
+    except EOFError:
+        _end_of_input()
 
 def level_up_animation(new_title, new_icon):
     clear()

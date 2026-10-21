@@ -10,7 +10,7 @@ import os
 # Ajouter le répertoire courant au path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.player import Player, LEVELS
+from core.player import Player, LEVELS, SaveCorrupted, SAVE_FILE
 from core.ui import *
 from core.game import show_categories, show_missions, run_mission
 from core.registry import ALL_MISSIONS as MISSIONS, count_total_missions
@@ -30,7 +30,7 @@ def main_menu(player):
         print(f"  XP : {YELLOW}{BOLD}{player.xp}{RESET}", end="")
         if next_lvl:
             nxp, ntitle, _ = next_lvl
-            bar = xp_bar(player.xp, nxp)
+            bar = xp_bar(player.xp, nxp, level_xp=current[0])
             print(f"  {bar}  → {ntitle} ({nxp - player.xp} XP)")
         else:
             print(f"  {GREEN}★ NIVEAU MAX ★{RESET}")
@@ -312,7 +312,7 @@ def show_settings(player):
 
     if choice == "1":
         new_name = prompt("Nouveau nom")
-        if new_name:
+        if new_name and new_name != "quit":
             player.name = new_name
             player.save()
             success(f"Nom changé en '{new_name}'")
@@ -346,7 +346,7 @@ def first_launch(player):
     slow_print(f"  → Tape 'hint' si tu bloques (coûte 5 XP).", delay=0.02)
     print()
     name = prompt("Entre ton pseudo de hacker")
-    if name:
+    if name and name != "quit":
         player.name = name
     player.save()
     success(f"Bienvenue, {player.name} ! L'aventure commence...")
@@ -355,7 +355,16 @@ def first_launch(player):
 
 def main():
     player = Player()
-    is_new = not player.load()
+    try:
+        is_new = not player.load()
+    except SaveCorrupted:
+        error(f"Ta sauvegarde {SAVE_FILE} est illisible (et sa copie .bak aussi).")
+        print(f"  Elle n'a pas été touchée. Répare-la ou renomme-la pour repartir de zéro.\n")
+        sys.exit(1)
+    if player.restored_from_backup:
+        warning("Sauvegarde abîmée : progression restaurée depuis la copie de secours.")
+        player.save()
+        press_enter()
 
     if is_new:
         first_launch(player)
@@ -371,4 +380,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Ctrl+C pendant une animation (en dehors d'une saisie)
+        print(f"\n{CYAN}  À bientôt ! Ta progression est sauvegardée.{RESET}\n")

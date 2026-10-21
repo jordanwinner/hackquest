@@ -1,91 +1,92 @@
 from core.registry import ALL_MISSIONS as MISSIONS
 from core.ui import *
+from core.validate import is_valid_answer
 
 def show_categories(player):
     """Affiche les catégories disponibles et verrouillées."""
-    clear()
-    banner()
-    print(f"{BOLD}  📋 CHOISIR UNE CATÉGORIE{RESET}\n")
+    while True:
+        clear()
+        banner()
+        print(f"{BOLD}  📋 CHOISIR UNE CATÉGORIE{RESET}\n")
 
-    categories = list(MISSIONS.items())
-    available = []
+        categories = list(MISSIONS.items())
+        available = []
 
-    for i, (cat_id, cat_data) in enumerate(categories):
-        unlocked = cat_id in player.unlocked_categories
-        completed = sum(
-            1 for m in cat_data["missions"]
-            if m["id"] in player.completed_missions
-        )
-        total = len(cat_data["missions"])
+        for i, (cat_id, cat_data) in enumerate(categories):
+            unlocked = cat_id in player.unlocked_categories
+            completed = sum(
+                1 for m in cat_data["missions"]
+                if m["id"] in player.completed_missions
+            )
+            total = len(cat_data["missions"])
 
-        if unlocked:
-            status = f"{GREEN}✅ {completed}/{total}{RESET}"
-            idx = len(available)
-            available.append((cat_id, cat_data))
-            print(f"  {CYAN}{BOLD}[{idx + 1}]{RESET} {cat_data['title']}")
-            print(f"      {DIM}{cat_data['description']}{RESET}")
-            print(f"      Progression : {status}")
-        else:
-            print(f"  {DIM}[🔒] {cat_data['title']} — {cat_data['description']}{RESET}")
-        print()
+            if unlocked:
+                status = f"{GREEN}✅ {completed}/{total}{RESET}"
+                idx = len(available)
+                available.append((cat_id, cat_data))
+                print(f"  {CYAN}{BOLD}[{idx + 1}]{RESET} {cat_data['title']}")
+                print(f"      {DIM}{cat_data['description']}{RESET}")
+                print(f"      Progression : {status}")
+            else:
+                print(f"  {DIM}[🔒] {cat_data['title']} — {cat_data['description']}{RESET}")
+            print()
 
-    separator()
-    print(f"  {DIM}[0] Retour au menu principal{RESET}\n")
+        separator()
+        print(f"  {DIM}[0] Retour au menu principal{RESET}\n")
 
-    choice = prompt("Choix")
-    if choice == "0" or choice.lower() == "q":
-        return None
+        choice = prompt("Choix")
+        if choice == "0" or choice.lower() in ("q", "quit"):
+            return None
 
-    try:
-        idx = int(choice) - 1
-        if 0 <= idx < len(available):
-            return available[idx]
-    except ValueError:
-        pass
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(available):
+                return available[idx]
+        except ValueError:
+            pass
 
-    error("Choix invalide.")
-    press_enter()
-    return show_categories(player)
+        error("Choix invalide.")
+        press_enter()
 
 
 def show_missions(player, cat_id, cat_data):
     """Affiche les missions d'une catégorie."""
-    clear()
-    banner()
-    print(f"{BOLD}  {cat_data['title']}{RESET}\n")
+    while True:
+        clear()
+        banner()
+        print(f"{BOLD}  {cat_data['title']}{RESET}\n")
 
-    missions = cat_data["missions"]
-    available = []
+        missions = cat_data["missions"]
+        available = []
 
-    for i, m in enumerate(missions):
-        done = m["id"] in player.completed_missions
-        if done:
-            status = f"{GREEN}✅ Complétée{RESET}"
-        else:
-            status = f"{YELLOW}⏳ En attente{RESET}"
-        available.append(m)
-        num = f"{CYAN}{BOLD}[{i+1}]{RESET}"
-        print(f"  {num} {BOLD}{m['title']}{RESET}  {DIM}(+{m['xp']} XP){RESET}")
-        print(f"      {status}")
-        print(f"      {DIM}{m['objective']}{RESET}\n")
+        for i, m in enumerate(missions):
+            done = m["id"] in player.completed_missions
+            if done:
+                status = f"{GREEN}✅ Complétée{RESET}"
+            else:
+                status = f"{YELLOW}⏳ En attente{RESET}"
+            available.append(m)
+            num = f"{CYAN}{BOLD}[{i+1}]{RESET}"
+            print(f"  {num} {BOLD}{m['title']}{RESET}  {DIM}(+{m['xp']} XP){RESET}")
+            print(f"      {status}")
+            print(f"      {DIM}{m['objective']}{RESET}\n")
 
-    separator()
-    print(f"  {DIM}[0] Retour{RESET}\n")
+        separator()
+        print(f"  {DIM}[0] Retour{RESET}\n")
 
-    choice = prompt("Choix de la mission")
-    if choice == "0" or choice.lower() in ("q", "back"):
-        return None
+        choice = prompt("Choix de la mission")
+        if choice == "0" or choice.lower() in ("q", "quit", "back"):
+            return None
 
-    try:
-        idx = int(choice) - 1
-        if 0 <= idx < len(available):
-            return available[idx]
-    except ValueError:
-        pass
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(available):
+                return available[idx]
+        except ValueError:
+            pass
 
-    error("Choix invalide.")
-    press_enter()
-    return show_missions(player, cat_id, cat_data)
+        error("Choix invalide.")
+        press_enter()
 
 
 def run_mission(player, mission):
@@ -128,7 +129,7 @@ def run_mission(player, mission):
         cmd = user_input.lower().strip()
 
         # ── Commandes spéciales ──
-        if cmd in ("back", "b", "retour"):
+        if cmd in ("back", "b", "retour", "q", "quit"):
             return
 
         if cmd in ("skip", "passer"):
@@ -154,8 +155,7 @@ def run_mission(player, mission):
             continue
 
         # ── Validation de la commande ──
-        accept = mission.get("accept_contains", [])
-        validated = any(keyword.lower() in user_input.lower() for keyword in accept)
+        validated = is_valid_answer(user_input, mission)
 
         if validated:
             mission_complete_animation(mission["xp"])

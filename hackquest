@@ -1,2 +1,3 @@
-#!/bin/bash
-cd /home/jordan/CTF/misc/hackquest && python3 hackquest.py "$@"
+#!/usr/bin/env bash
+# Lanceur : suit le lien symbolique pour trouver le dossier du jeu, où qu'il soit
+exec python3 "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/hackquest.py" "$@"

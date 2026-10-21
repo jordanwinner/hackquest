@@ -11,6 +11,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 INSTALL_DIR="$HOME/.hackquest"
+REPO_URL="https://github.com/jordanwinner/hackquest.git"
 BIN_DIR="$HOME/.local/bin"
 
 echo -e "\n${CYAN}${BOLD}"
@@ -37,24 +38,30 @@ fi
 
 echo -e "  ${GREEN}✅ Python 3 détecté${NC}"
 
-# ── Copier les fichiers
-echo -e "  📁 Installation dans $INSTALL_DIR..."
-mkdir -p "$INSTALL_DIR"
-
-# Si on est déjà dans le dossier du projet
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cp -r "$SCRIPT_DIR/core"        "$INSTALL_DIR/"
-cp    "$SCRIPT_DIR/hackquest.py" "$INSTALL_DIR/"
-
-echo -e "  ${GREEN}✅ Fichiers copiés${NC}"
+# ── Récupérer le jeu
+# Lancé depuis un clone : on utilise ce dossier tel quel (pas de copie qui divergerait).
+# Lancé via `curl | bash` : il n'y a pas de dossier, on clone le repo dans ~/.hackquest.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+if [ -f "$SCRIPT_DIR/hackquest.py" ]; then
+    GAME_DIR="$SCRIPT_DIR"
+    echo -e "  ${GREEN}✅ Jeu trouvé dans $GAME_DIR${NC}"
+else
+    command -v git &>/dev/null || { echo -e "${RED}❌ git est requis : sudo apt install git${NC}"; exit 1; }
+    GAME_DIR="$INSTALL_DIR"
+    if [ -d "$GAME_DIR/.git" ]; then
+        echo -e "  🔄 Mise à jour de $GAME_DIR..."
+        git -C "$GAME_DIR" pull --ff-only -q
+    else
+        echo -e "  📥 Téléchargement dans $GAME_DIR..."
+        git clone -q "$REPO_URL" "$GAME_DIR"
+    fi
+    echo -e "  ${GREEN}✅ Fichiers prêts${NC}"
+fi
 
 # ── Créer la commande hackquest dans ~/.local/bin
 mkdir -p "$BIN_DIR"
-cat > "$BIN_DIR/hackquest" << EOF
-#!/usr/bin/env bash
-cd "$INSTALL_DIR" && python3 hackquest.py "\$@"
-EOF
-chmod +x "$BIN_DIR/hackquest"
+chmod +x "$GAME_DIR/hackquest"
+ln -sf "$GAME_DIR/hackquest" "$BIN_DIR/hackquest"
 
 echo -e "  ${GREEN}✅ Commande 'hackquest' installée dans $BIN_DIR${NC}"
 
@@ -67,7 +74,8 @@ elif [ -f "$HOME/.bashrc" ]; then
 fi
 
 if [ -n "$SHELL_RC" ]; then
-    if ! grep -q "$BIN_DIR" "$SHELL_RC" 2>/dev/null; then
+    # la ligne écrite contient « $HOME » littéralement : on cherche les deux formes
+    if ! grep -qF -e "$BIN_DIR" -e '$HOME/.local/bin' "$SHELL_RC" 2>/dev/null; then
         echo "" >> "$SHELL_RC"
         echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
         echo -e "  ${GREEN}✅ PATH mis à jour dans $SHELL_RC${NC}"
@@ -78,7 +86,7 @@ fi
 echo -e "\n  🧪 Test de démarrage..."
 if python3 -c "
 import sys
-sys.path.insert(0, '$INSTALL_DIR')
+sys.path.insert(0, '$GAME_DIR')
 from core.registry import count_total_missions
 print(f'  {count_total_missions()} missions chargées')
 " 2>/dev/null; then
@@ -89,4 +97,8 @@ else
 fi
 
 echo -e "\n  Pour lancer le jeu :"
-echo -e "  ${CYAN}${BOLD}  source $SHELL_RC && hackquest${NC}\n"
+if [ -n "$SHELL_RC" ]; then
+    echo -e "  ${CYAN}${BOLD}  source $SHELL_RC && hackquest${NC}\n"
+else
+    echo -e "  ${CYAN}${BOLD}  hackquest${NC}\n"
+fi

@@ -3,6 +3,29 @@ import os
 from datetime import datetime
 
 SAVE_FILE = os.path.expanduser("~/.hackquest_save.json")
+BACKUP_FILE = SAVE_FILE + ".bak"
+
+
+class SaveCorrupted(Exception):
+    """La sauvegarde existe mais est illisible : on ne doit surtout pas l'écraser."""
+
+
+def _write_json(path, data):
+    """Écriture atomique : un crash pendant l'écriture ne laisse jamais un fichier à moitié écrit."""
+    tmp = f"{path}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _read_json(path):
+    with open(path) as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError("format inattendu")
+    return data
 
 LEVELS = [
     (0,    "Newbie",         "⚪"),
@@ -102,6 +125,7 @@ class Player:
         self.unlocked_categories = ["linux_navigation", "linux_files"]
         self.hints_used = 0
         self.created_at = datetime.now().isoformat()
+        self.restored_from_backup = False
 
     def get_level_info(self):
         current = LEVELS[0]
@@ -148,23 +172,36 @@ class Player:
             "hints_used": self.hints_used,
             "created_at": self.created_at,
         }
-        with open(SAVE_FILE, "w") as f:
-            json.dump(data, f, indent=2)
+        data["_migrated"] = True
+        # garde la version précédente : une seule mauvaise écriture ne fait pas tout perdre
+        # (seulement si elle est lisible, sinon on écraserait la bonne copie par une mauvaise)
+        try:
+            _read_json(SAVE_FILE)
+            os.replace(SAVE_FILE, BACKUP_FILE)
+        except (OSError, ValueError):
+            pass
+        _write_json(SAVE_FILE, data)
 
     def load(self):
-        if not os.path.exists(SAVE_FILE):
+        """True si une partie a été chargée, False s'il n'y en a pas.
+        Lève SaveCorrupted si la sauvegarde et sa copie sont illisibles."""
+        if not os.path.exists(SAVE_FILE) and not os.path.exists(BACKUP_FILE):
             return False
         try:
-            with open(SAVE_FILE) as f:
-                data = json.load(f)
+            data = _read_json(SAVE_FILE)
+        except (OSError, ValueError):
+            try:
+                data = _read_json(BACKUP_FILE)
+            except (OSError, ValueError):
+                raise SaveCorrupted(SAVE_FILE)
+            self.restored_from_backup = True
 
-            # Migration automatique des anciennes sauvegardes
-            if not data.get("_migrated"):
-                data = _migrate_save(data)
-                # Sauvegarder la version migrée immédiatement
-                with open(SAVE_FILE, "w") as f:
-                    json.dump(data, f, indent=2)
+        # Migration automatique des anciennes sauvegardes
+        if not data.get("_migrated"):
+            data = _migrate_save(data)
+            _write_json(SAVE_FILE, data)
 
+        try:
             self.name = data.get("name", "Hacker")
             self.xp = data.get("xp", 0)
             self.level = data.get("level", 0)
@@ -174,9 +211,9 @@ class Player:
             self.created_at = data.get("created_at", datetime.now().isoformat())
             # Applique les déblocages au chargement
             self.check_and_apply_unlocks()
-            return True
-        except Exception:
-            return False
+        except (TypeError, AttributeError):
+            raise SaveCorrupted(SAVE_FILE)
+        return True
 
     def stats(self):
         current, next_lvl = self.get_level_info()
