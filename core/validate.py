@@ -88,3 +88,9 @@ def is_valid_answer(user_input, mission):
     # les commandes attendues comptent aussi (`unzip` pour une mission « zip et unzip »)
     keywords = list(mission.get("accept_contains", [])) + list(mission.get("expected_cmd", []))
     return any(keyword_matches(user_input, k, heads) for k in keywords)
+
+
+def same_tool(user_input, mission):
+    """True si le joueur utilise le bon outil (ex. `ls`) sans encore la bonne forme (ex. `ls -lh`)."""
+    heads = _heads(mission.get("expected_cmd", []))
+    return any(keyword_matches(user_input, h, heads) for h in heads)

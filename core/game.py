@@ -1,6 +1,6 @@
 from core.registry import ALL_MISSIONS as MISSIONS
 from core.ui import *
-from core.validate import is_valid_answer
+from core.validate import is_valid_answer, same_tool
 from core.labs import LABS, WHERE
 from core import sandbox
 
@@ -340,7 +340,10 @@ def run_lab_mission(player, mission, spec):
                 _complete(player, mission, already_done)
                 return
             if right_command:
-                print(f"{DIM}  ↳ C'est la bonne commande, mais l'objectif n'est pas encore atteint. "
-                      f"Relis-le ('objectif') ou tape 'hint'.{RESET}")
+                print(f"{YELLOW}  ↳ Bonne commande, mais l'objectif n'est pas encore atteint "
+                      f"(mauvais fichier ? mauvais dossier ?). Tape 'objectif' ou 'hint'.{RESET}")
+            elif same_tool(line, mission):
+                print(f"{YELLOW}  ↳ Bonne piste, mais ce n'est pas encore ça : il manque une option "
+                      f"ou un argument. Tape 'objectif' ou 'hint'.{RESET}")
     finally:
         lab.close()
