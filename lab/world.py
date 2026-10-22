@@ -319,6 +319,7 @@ os.makedirs("/opt/hq", exist_ok=True)
 write("/opt/hq/web.py", r'''#!/usr/bin/env python3
 """Serveur d'entraînement HackQuest — 100% local, aucune vraie base de données.
 Les « failles » sont scriptées pour l'apprentissage : rien n'est réellement exploitable."""
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -329,6 +330,8 @@ PAGES = {
     "/backup": "<h1>Sauvegardes</h1><a href=/backup/dump.sql>dump.sql</a>",
     "/config.php": "<!-- TODO: retirer les identifiants de debug -->",
     "/secret": "<h1>Zone secrete</h1>FLAG{repertoire_cache_trouve}",
+    # servi par la cible interne du scénario de pivot (reseau multi-cibles)
+    "/loot": "<h1>Donnees internes</h1>FLAG{pivot_reseau_interne}",
 }
 
 class H(BaseHTTPRequestHandler):
@@ -359,7 +362,8 @@ class H(BaseHTTPRequestHandler):
         self.rfile.read(length)
         self._send(200, "Requete POST recue. FLAG{post_envoye}")
 
-HTTPServer(("127.0.0.1", 80), H).serve_forever()
+BIND = os.environ.get("HQ_BIND", "127.0.0.1")   # 0.0.0.0 pour la cible interne du pivot
+HTTPServer((BIND, 80), H).serve_forever()
 ''', 0o755)
 
 # ── Liste de mots pour l'énumération et le cassage (petite = cassage rapide) ──
@@ -376,6 +380,14 @@ wait_port() { for _ in $(seq 1 50); do (echo >/dev/tcp/127.0.0.1/$1) 2>/dev/null
 for s in "$@"; do case "$s" in
   web) pgrep -f /opt/hq/web.py >/dev/null || nohup python3 /opt/hq/web.py >/var/log/hqweb.log 2>&1 &
        wait_port 80 ;;
+  web-net) pgrep -f /opt/hq/web.py >/dev/null || HQ_BIND=0.0.0.0 nohup python3 /opt/hq/web.py >/var/log/hqweb.log 2>&1 &
+       wait_port 80 ;;
+  ssh-net) mkdir -p /run/sshd
+       pgrep -f "sshd.*Port=22" >/dev/null || /usr/sbin/sshd \
+         -o Port=22 -o ListenAddress=0.0.0.0 \
+         -o PasswordAuthentication=yes -o PubkeyAuthentication=yes \
+         -o UsePAM=no -o StrictModes=no
+       wait_port 22 ;;
   ssh) mkdir -p /run/sshd
        pgrep -f "sshd.*Port=22" >/dev/null || /usr/sbin/sshd \
          -o Port=22 -o ListenAddress=127.0.0.1 \

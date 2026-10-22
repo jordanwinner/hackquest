@@ -82,10 +82,13 @@ def build_image(on_line=print, attempts=2):
 
 
 def cleanup_stale():
-    """Supprime les conteneurs oubliés par une partie précédente (crash, kill...)."""
+    """Supprime les conteneurs ET réseaux oubliés par une partie précédente (crash, kill...)."""
     ids = _docker("ps", "-aq", "--filter", f"label={LABEL}").stdout.split()
     if ids:
         _docker("rm", "-f", *ids)
+    nets = _docker("network", "ls", "-q", "--filter", f"label={LABEL}").stdout.split()
+    if nets:
+        _docker("network", "rm", *nets)
 
 
 # Le shell n'a pas de vrai terminal : sa sortie arrive dans un pipe. Pour que `ls` et `grep`
@@ -111,7 +114,10 @@ class ShellError(Exception):
 class Lab:
     def __init__(self, spec):
         self.spec = spec
-        self.name = f"hq-lab-{uuid.uuid4().hex[:8]}"
+        # mode « attache » : on se branche sur un conteneur déjà lancé (ex. la
+        # machine de rebond d'un scénario réseau) au lieu d'en créer un.
+        self.attached = bool(spec.get("attach"))
+        self.name = spec["attach"] if self.attached else f"hq-lab-{uuid.uuid4().hex[:8]}"
         self.shell = None
         self.shell_pid = None
         self.cwd = spec.get("cwd", HOME)
@@ -120,6 +126,10 @@ class Lab:
 
     # ── cycle de vie ─────────────────────────────────────────────────────
     def start(self):
+        if self.attached:                       # conteneur déjà prêt : on ouvre juste un shell
+            atexit.register(self.close)
+            self._open_shell()
+            return
         res = _docker(
             "run", "-d", "--rm", "--name", self.name, "--label", LABEL,
             "--platform", PLATFORM,
@@ -170,7 +180,8 @@ class Lab:
             except OSError:
                 pass
             self.shell = None
-        _docker("rm", "-f", self.name)
+        if not self.attached:                   # en mode attache, le conteneur est géré ailleurs
+            _docker("rm", "-f", self.name)
 
     def reset(self):
         self.close()
@@ -274,7 +285,10 @@ class Lab:
     def check(self, output, code):
         """L'objectif est atteint si au moins une des alternatives de `checks` est remplie.
         Sans `checks`, il suffit que la commande ait réussi (code 0)."""
-        alternatives = self.spec.get("checks")
+        return self.check_against(output, code, self.spec.get("checks"))
+
+    def check_against(self, output, code, alternatives):
+        """Comme check(), mais avec une liste de `checks` fournie (scénario réseau)."""
         if not alternatives:
             return code == 0
         return any(self._check_one(alt, output) for alt in alternatives)
@@ -299,6 +313,56 @@ class Lab:
 
     def prompt_path(self):
         return "~" + self.cwd[len(HOME):] if self.cwd.startswith(HOME) else self.cwd
+
+
+class NetScenario:
+    """Scénario multi-cibles : un petit réseau Docker INTERNE (sans accès Internet)
+    avec une machine de rebond (le joueur y a son shell) et une cible interne,
+    joignable seulement depuis le rebond. Tout est détruit à la fin.
+
+    Mémoire : 2 × 256 Mo — tient sur un petit serveur (≈ 836 Mo).
+    """
+    SUBNET = "172.30.0.0/24"
+    JUMP_IP = "172.30.0.10"
+    INTERNAL_IP = "172.30.0.20"
+
+    def __init__(self):
+        uid = uuid.uuid4().hex[:8]
+        self.net = f"hq-net-{uid}"
+        self.jump = f"hq-jump-{uid}"
+        self.internal = f"hq-int-{uid}"
+
+    def _run_host(self, name, ip, alias, hostname):
+        args = ["run", "-d", "--rm", "--name", name, "--label", LABEL, "--platform", PLATFORM,
+                "--network", self.net, "--ip", ip, "--network-alias", alias,
+                "--hostname", hostname, "--security-opt", "no-new-privileges",
+                "--memory", "256m", "--pids-limit", "256", "--cpus", "1", image_tag()]
+        res = _docker(*args)
+        if res.returncode != 0:
+            raise ShellError(res.stderr.strip() or f"docker run {name} a échoué")
+
+    def start(self):
+        res = _docker("network", "create", "--internal", "--subnet", self.SUBNET,
+                      "--label", LABEL, self.net)
+        if res.returncode != 0:
+            raise ShellError(res.stderr.strip() or "création du réseau a échoué")
+        atexit.register(self.close)
+        # cible interne : services web + ssh accessibles sur tout le réseau (0.0.0.0)
+        self._run_host(self.internal, self.INTERNAL_IP, "interne", "srv-interne")
+        _docker("exec", "-u", "root", self.internal, "bash", "-c", "/opt/hq/svc web-net ssh-net")
+        # machine de rebond : là où le joueur a son shell
+        self._run_host(self.jump, self.JUMP_IP, "rebond", "srv-rebond")
+
+    def jump_lab(self):
+        """Un shell interactif (classe Lab en mode attache) sur la machine de rebond."""
+        lab = Lab({"attach": self.jump, "cwd": HOME, "prompt_host": "srv-rebond"})
+        lab.start()
+        return lab
+
+    def close(self):
+        for c in (self.jump, self.internal):
+            _docker("rm", "-f", c)
+        _docker("network", "rm", self.net)
 
 
 def incomplete(command):

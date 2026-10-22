@@ -311,10 +311,136 @@ def run_text_mission(player, mission, chain=True):
         press_enter()
 
 
+PIVOT = {
+    "intro": [
+        "Tu as pris pied sur une machine de rebond (srv-rebond, 172.30.0.10).",
+        "Elle est connectée à un réseau interne isolé — sans accès Internet.",
+        "Une autre machine s'y cache : à toi de la trouver et de la piller.",
+    ],
+    "objectives": [
+        {
+            "id": "pivot_recon", "title": "Reconnaissance du réseau interne", "xp": 40,
+            "story": "Depuis le rebond, une cible interne existe quelque part sur 172.30.0.0/24.",
+            "objective": "Scanne le réseau interne et repère la cible (172.30.0.20).",
+            "expected_cmd": ["nmap"], "accept_contains": ["nmap"],
+            "hints": ["nmap 172.30.0.20 scanne directement la cible.",
+                      "nmap 172.30.0.0/24 balaie tout le sous-réseau interne."],
+            "checks": [{"out": ["172.30.0.20", "open"]}],
+        },
+        {
+            "id": "pivot_loot", "title": "Pillage de la cible interne", "xp": 60,
+            "story": "La cible 172.30.0.20 expose un service web interne. Récupère ses données.",
+            "objective": "Lis le flag servi par le web interne (chemin /loot).",
+            "expected_cmd": ["curl", "wget"], "accept_contains": ["curl", "wget"],
+            "hints": ["curl http://172.30.0.20/ pour voir le service.",
+                      "Le butin est sur /loot : curl http://172.30.0.20/loot"],
+            "checks": [{"out": "FLAG{pivot_reseau_interne}"}],
+        },
+    ],
+    "outro": [
+        "Cible interne compromise : tu as pivoté depuis le rebond vers un réseau",
+        "qui n'était pas joignable de l'extérieur. C'est le cœur du mouvement latéral.",
+    ],
+}
+
+
+def run_pivot(player):
+    """Scénario multi-cibles : réseau Docker interne (rebond + cible), tout isolé."""
+    if not _lab_ready(player):
+        clear(); header("Pivot")
+        warning("Le scénario de pivot a besoin du vrai bac à sable (Docker).")
+        print(f"  {DIM}Installe Docker pour jouer le réseau multi-cibles.{RESET}")
+        press_enter()
+        return
+    clear(); header("Pivot — réseau interne")
+    print(f"\n  {MAGENTA}{BOLD}🕸️  Scénario de pivot{RESET}\n")
+    for line in PIVOT["intro"]:
+        print(f"  {line}")
+    print(f"\n  {DIM}⚙  Démarrage du réseau interne (2 machines)…{RESET}", flush=True)
+    sandbox.cleanup_stale()
+    scn = sandbox.NetScenario()
+    lab = None
+    try:
+        scn.start()
+        lab = scn.jump_lab()
+    except sandbox.ShellError as e:
+        if lab:
+            lab.close()
+        scn.close()
+        error(f"Impossible de monter le réseau ({e}).")
+        print(f"  {DIM}Mémoire insuffisante ? Ferme des applications et réessaie.{RESET}")
+        press_enter()
+        return
+    try:
+        print(f"\r{GREEN}  💻 Connecté à srv-rebond (172.30.0.10){RESET} {DIM}— réseau interne "
+              f"172.30.0.0/24, sans Internet.{RESET}")
+        _lab_help()
+        for obj in PIVOT["objectives"]:
+            already = obj["id"] in player.completed_missions
+            print(f"\n  {CYAN}{BOLD}▶ {obj['title']}{RESET} {DIM}(+{obj['xp']} XP){RESET}")
+            print(f"  {DIM}📖 {obj['story']}{RESET}")
+            print(f"  {YELLOW}🎯 {obj['objective']}{RESET}\n")
+            hint_index = 0
+            while True:
+                line = _shell_input(lab)
+                cmd = line.strip()
+                if not cmd:
+                    continue
+                word = cmd.lower()
+                if word in ("back", "retour", "quit"):
+                    return
+                if word in ("skip", "passer"):
+                    warning("Objectif passé.")
+                    break
+                if word == "hint":
+                    hint_index = _hint(player, obj, hint_index)
+                    print()
+                    continue
+                if word in ("objectif", "obj"):
+                    print(f"\n{YELLOW}  🎯 {obj['objective']}{RESET}\n")
+                    continue
+                if word in ("aide", "help"):
+                    _lab_help()
+                    continue
+                if word == "clear":
+                    clear()
+                    continue
+                tip = _interactive_tip(cmd)
+                if tip:
+                    print(f"{YELLOW}  ↳ {tip}{RESET}")
+                    continue
+                code, output, interrupted = lab.run(line)
+                if interrupted == "ctrl-c":
+                    print(f"{DIM}  ⏹  Commande arrêtée (Ctrl+C).{RESET}")
+                elif interrupted:
+                    print(f"{DIM}  ⏱  Commande arrêtée après {lab.timeout} s.{RESET}")
+                if is_valid_answer(line, obj) and lab.check_against(output, code, obj["checks"]):
+                    _complete(player, obj, already)
+                    break
+                if is_valid_answer(line, obj):
+                    print(f"{YELLOW}  ↳ Bonne commande, mais pas encore le bon résultat. "
+                          f"'objectif' ou 'hint'.{RESET}")
+        clear(); header("Pivot")
+        print(f"\n  {GREEN}{BOLD}")
+        print("  ╔════════════════════════════════════════╗")
+        print("  ║     🕸️   PIVOT RÉUSSI — RÉSEAU INTERNE    ║")
+        print("  ╚════════════════════════════════════════╝")
+        print(f"{RESET}")
+        for line in PIVOT["outro"]:
+            print(f"  {line}")
+        print()
+        press_enter()
+    finally:
+        if lab:
+            lab.close()
+        scn.close()
+
+
 def _shell_input(lab):
     """Lit une commande comme un vrai shell : Ctrl+C annule la ligne,
     Ctrl+D quitte la mission, une commande inachevée continue sur la ligne suivante."""
-    ps1 = f"{GREEN}{BOLD}hacker@srv-target{RESET}:{BLUE}{BOLD}{lab.prompt_path()}{RESET}$ "
+    host = lab.spec.get("prompt_host", "srv-target")
+    ps1 = f"{GREEN}{BOLD}hacker@{host}{RESET}:{BLUE}{BOLD}{lab.prompt_path()}{RESET}$ "
     try:
         line = input(ps1)
         while line.strip() and sandbox.incomplete(line):
