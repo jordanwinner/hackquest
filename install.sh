@@ -14,6 +14,19 @@ INSTALL_DIR="$HOME/.hackquest"
 REPO_URL="https://github.com/jordanwinner/hackquest.git"
 BIN_DIR="$HOME/.local/bin"
 
+# ── Installation de dépendances (systèmes apt : Ubuntu/Debian) ─────────────
+# sudo seulement si on n'est pas déjà root et que sudo existe.
+SUDO=""
+[ "$(id -u)" -ne 0 ] && command -v sudo &>/dev/null && SUDO="sudo"
+HAS_APT=0; command -v apt-get &>/dev/null && HAS_APT=1
+_apt_updated=0
+
+apt_install() {                 # $1 = paquet ; renvoie 0 si installé avec succès
+    [ "$HAS_APT" = 1 ] || return 1
+    if [ "$_apt_updated" = 0 ]; then $SUDO apt-get update -qq && _apt_updated=1; fi
+    $SUDO apt-get install -y -qq "$1" >/dev/null 2>&1
+}
+
 echo -e "\n${CYAN}${BOLD}"
 echo "  ██╗  ██╗ █████╗  ██████╗██╗  ██╗ ██████╗ ██╗   ██╗███████╗███████╗████████╗"
 echo "  ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔═══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝"
@@ -24,10 +37,14 @@ echo "  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝ 
 echo -e "${NC}"
 echo -e "  ${BOLD}Installation de HackQuest${NC}\n"
 
-# ── Vérifier Python 3
+# ── Vérifier (et installer si besoin) Python 3
 if ! command -v python3 &>/dev/null; then
-    echo -e "${RED}❌ Python 3 est requis. Installe-le avec : sudo apt install python3${NC}"
-    exit 1
+    echo -e "  ⚙  Python 3 manquant : installation..."
+    apt_install python3
+    if ! command -v python3 &>/dev/null; then
+        echo -e "${RED}❌ Python 3 est requis. Installe-le avec : sudo apt install python3${NC}"
+        exit 1
+    fi
 fi
 
 PYTHON_VERSION=$(python3 -c "import sys; print(sys.version_info.minor)")
@@ -46,7 +63,11 @@ if [ -f "$SCRIPT_DIR/hackquest.py" ]; then
     GAME_DIR="$SCRIPT_DIR"
     echo -e "  ${GREEN}✅ Jeu trouvé dans $GAME_DIR${NC}"
 else
-    command -v git &>/dev/null || { echo -e "${RED}❌ git est requis : sudo apt install git${NC}"; exit 1; }
+    if ! command -v git &>/dev/null; then
+        echo -e "  ⚙  git manquant : installation..."
+        apt_install git
+        command -v git &>/dev/null || { echo -e "${RED}❌ git est requis : sudo apt install git${NC}"; exit 1; }
+    fi
     GAME_DIR="$INSTALL_DIR"
     if [ -d "$GAME_DIR/.git" ]; then
         echo -e "  🔄 Mise à jour de $GAME_DIR..."
@@ -113,12 +134,36 @@ else
 fi
 
 # ── Docker (optionnel) : nécessaire pour les missions 💻 dans le vrai shell
+#    On ne l'installe pas en douce : il modifie le système (démon + groupe + reconnexion).
+#    → proposé seulement en interactif, ou forcé avec HQ_INSTALL_DOCKER=1.
+install_docker() {
+    echo -e "  ⚙  Installation de Docker..."
+    apt_install docker.io || return 1
+    [ -n "$SUDO" ] && $SUDO usermod -aG docker "$USER" 2>/dev/null
+    command -v docker &>/dev/null
+}
+
 if command -v docker &>/dev/null && docker info &>/dev/null; then
     echo -e "  ${GREEN}✅ Docker détecté : les missions 💻 se joueront dans un vrai shell${NC}"
 else
-    echo -e "\n  ${BOLD}💻 Optionnel :${NC} installe Docker pour jouer les missions dans un vrai shell :"
-    echo -e "     sudo apt install docker.io && sudo usermod -aG docker \$USER"
-    echo -e "     (puis déconnecte-toi / reconnecte-toi). Sans Docker, le jeu marche en mode texte."
+    docker_done=0
+    if [ "$HAS_APT" = 1 ]; then
+        if [ "${HQ_INSTALL_DOCKER:-0}" = 1 ]; then
+            install_docker && docker_done=1
+        elif [ -t 0 ]; then       # terminal interactif : on demande
+            printf "\n  💻 Installer Docker pour jouer dans un vrai shell ? [o/N] "
+            read -r rep
+            case "$rep" in [oOyY]*) install_docker && docker_done=1 ;; esac
+        fi
+    fi
+    if [ "$docker_done" = 1 ]; then
+        echo -e "  ${GREEN}✅ Docker installé.${NC} ${BOLD}Déconnecte-toi / reconnecte-toi${NC} pour que le groupe docker prenne effet."
+    else
+        echo -e "\n  ${BOLD}💻 Optionnel :${NC} installe Docker pour jouer les missions dans un vrai shell :"
+        echo -e "     sudo apt install docker.io && sudo usermod -aG docker \$USER"
+        echo -e "     (puis déconnecte-toi / reconnecte-toi). Sans Docker, le jeu marche en mode texte."
+        echo -e "     ${CYAN}Astuce :${NC} relance avec ${CYAN}HQ_INSTALL_DOCKER=1${NC} pour l'installer automatiquement."
+    fi
 fi
 
 echo -e "\n  ${BOLD}C'est prêt !${NC} Quand tu veux jouer et apprendre, tape simplement :"
