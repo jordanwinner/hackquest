@@ -89,3 +89,11 @@ La progression est enregistrée dans `~/.hackquest_save.json`. Une copie de la v
 ## Mettre à jour
 
 Relance la commande d'installation : elle fait un `git pull` et ta progression est conservée. Si le labo a changé, le jeu propose de le reconstruire.
+
+## Désinstaller
+
+```bash
+./uninstall.sh
+```
+
+Retire la commande `hackquest`, les lignes ajoutées au PATH, les conteneurs et **l'image Docker du labo** (~670 Mo). Ta progression est conservée ; ajoute `--purge` pour l'effacer aussi. Le script propose à la fin de supprimer le dossier du jeu.
