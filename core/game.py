@@ -119,7 +119,7 @@ def _lab_ready(player):
     print(f"{BOLD}  💻 Le labo n'est pas encore construit{RESET}\n")
     print("  Les missions 💻 se jouent dans un vrai shell, sur un faux serveur isolé")
     print("  (conteneur Docker sans réseau, détruit après chaque mission).")
-    print(f"  Il faut le construire une fois : ~300 Mo, quelques minutes, connexion requise.\n")
+    print(f"  Il faut le construire une fois : ~700 Mo, quelques minutes, connexion requise.\n")
     if prompt("Construire maintenant ? [O/n]").lower() in ("n", "non", "quit"):
         _session["declined"] = True
         info("Mode texte pour cette session (réglable dans ⚙️ Paramètres).")
@@ -324,6 +324,33 @@ def _shell_input(lab):
         return "back"
 
 
+# Programmes plein écran ou qui attendent le clavier : le labo n'a pas de vrai
+# terminal, on explique plutôt que de laisser une erreur obscure.
+_INTERACTIVE = {
+    "top": "pas d'affichage plein écran ici : essaie `top -b -n 1` ou `ps aux`.",
+    "htop": "pas d'affichage plein écran ici : essaie `top -b -n 1` ou `ps aux`.",
+    "vim": "pas d'éditeur ici : écris avec `echo 'texte' > fichier` ou `cat > fichier << EOF`.",
+    "vi": "pas d'éditeur ici : écris avec `echo 'texte' > fichier` ou `cat > fichier << EOF`.",
+    "nano": "pas d'éditeur ici : écris avec `echo 'texte' > fichier` ou `cat > fichier << EOF`.",
+    "python3": "pas de console interactive ici : lance `python3 -c '...'` ou `python3 script.py`.",
+    "python": "pas de console interactive ici : lance `python3 -c '...'` ou `python3 script.py`.",
+    "bash": "tu es déjà dans bash : pas besoin d'en ouvrir un autre.",
+    "sh": "tu es déjà dans un shell : pas besoin d'en ouvrir un autre.",
+}
+
+
+def _interactive_tip(cmd):
+    """Conseil si la commande lance un programme interactif, sinon None."""
+    parts = cmd.split()
+    if not parts or parts[0] not in _INTERACTIVE:
+        return None
+    if parts[0] == "top" and "-b" in parts:
+        return None
+    if parts[0] in ("python3", "python", "bash", "sh") and len(parts) > 1:
+        return None
+    return _INTERACTIVE[parts[0]]
+
+
 def _lab_help():
     print(f"  {DIM}Commandes du jeu : {YELLOW}hint{RESET}{DIM} (-5 XP) · objectif · reset (labo neuf) · "
           f"clear · skip · back (ou Ctrl+D){RESET}\n")
@@ -366,7 +393,11 @@ def run_lab_mission(player, mission, spec):
                 print()
                 continue
             if word in ("objectif", "obj"):
-                print(f"\n{YELLOW}  🎯 {mission['objective']}{RESET}\n")
+                print(f"\n  {DIM}📖 {mission['story']}{RESET}")
+                print(f"{YELLOW}  🎯 {mission['objective']}{RESET}")
+                if mission["id"] in WHERE:
+                    print(f"  📂 Fichier de la mission : {CYAN}{WHERE[mission['id']]}{RESET}")
+                print()
                 continue
             if word in ("aide", "help"):
                 _lab_help()
@@ -380,8 +411,14 @@ def run_lab_mission(player, mission, spec):
                 continue
 
             # ── Vraie commande ──
+            tip = _interactive_tip(cmd)
+            if tip:
+                print(f"{YELLOW}  ↳ {tip}{RESET}")
+                continue
             code, output, interrupted = lab.run(line)
-            if interrupted:
+            if interrupted == "ctrl-c":
+                print(f"{DIM}  ⏹  Commande arrêtée (Ctrl+C).{RESET}")
+            elif interrupted:
                 print(f"{DIM}  ⏱  Commande arrêtée après {lab.timeout} s "
                       f"(dans un vrai terminal, c'est Ctrl+C qui l'arrête).{RESET}")
 

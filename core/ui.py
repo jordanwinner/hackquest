@@ -97,7 +97,8 @@ def _end_of_input():
 def prompt(text=""):
     """Ctrl+C renvoie "quit" (retour au menu précédent), Ctrl+D quitte le jeu."""
     try:
-        return input(f"\n{MAGENTA}{BOLD}❯ {text}{RESET}").strip()
+        sep = " " if text and not text.endswith(" ") else ""
+        return input(f"\n{MAGENTA}{BOLD}❯ {text}{sep}{RESET}").strip()
     except KeyboardInterrupt:
         print()
         return "quit"
@@ -113,22 +114,23 @@ def press_enter():
         _end_of_input()
 
 def level_up_animation(new_title, new_icon):
-    clear()
-    print(f"\n{YELLOW}{BOLD}")
-    print("  ╔══════════════════════════════════════╗")
-    print("  ║                                      ║")
-    print(f"  ║     {new_icon}  LEVEL UP !  {new_icon}                ║")
-    print(f"  ║     Nouveau rang : {new_title:<18}║")
-    print("  ║                                      ║")
-    print("  ╚══════════════════════════════════════╝")
-    print(f"{RESET}")
-    time.sleep(2)
+    # pas de clear() : le joueur doit encore voir le résultat de sa commande
+    # et les catégories débloquées, affichés juste au-dessus
+    w = 38
+    title = f"Nouveau rang : {new_title}"
+    print(f"{YELLOW}{BOLD}")
+    print(f"  ╔{'═' * w}╗")
+    print(f"  ║     {new_icon}  LEVEL UP !  {new_icon}{' ' * (w - 23)}║")  # emojis : 2 colonnes
+    print(f"  ║     {title}{' ' * max(1, w - 5 - len(title))}║")
+    print(f"  ╚{'═' * w}╝")
+    print(f"{RESET}", end="")
+    time.sleep(1.5)
 
 def mission_complete_animation(xp_gained):
     print(f"\n{GREEN}{BOLD}")
     print("  ┌─────────────────────────────┐")
     print("  │   ✅  MISSION ACCOMPLIE !   │")
-    print(f"  │   +{xp_gained} XP gagné{' ' * (20 - len(str(xp_gained)))}│")
+    print(f"  │   +{xp_gained} XP gagné{' ' * (16 - len(str(xp_gained)))}│")
     print("  └─────────────────────────────┘")
     print(f"{RESET}")
     time.sleep(1.5)

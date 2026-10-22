@@ -11,7 +11,7 @@ Les missions avancées se jouent dans un **vrai shell**, sur un faux serveur com
 ![Docker](https://img.shields.io/badge/Docker-optionnel-2496ED?logo=docker&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-terminal-FCC624?logo=linux&logoColor=black)
 ![Missions](https://img.shields.io/badge/missions-318-brightgreen)
-![Vrai shell](https://img.shields.io/badge/vrai%20shell-113%20labos-E8513F)
+![Vrai shell](https://img.shields.io/badge/vrai%20shell-145%20labos-E8513F)
 ![License](https://img.shields.io/badge/licence-MIT-green)
 
 <img src="docs/images/menu.png" width="720" alt="Menu principal de HackQuest">
@@ -55,14 +55,14 @@ sudo apt install docker.io
 sudo usermod -aG docker $USER      # puis déconnecte-toi / reconnecte-toi
 ```
 
-Sans Docker, le jeu fonctionne quand même : ces missions passent en **mode texte**. Le conteneur du labo est construit automatiquement au premier lancement (~670 Mo, une seule fois), ne tourne **que pendant une mission**, et est **détruit juste après**.
+Sans Docker, le jeu fonctionne quand même : ces missions passent en **mode texte**. Le conteneur du labo est construit automatiquement au premier lancement (~830 Mo, une seule fois), ne tourne **que pendant une mission**, et est **détruit juste après**.
 
 ---
 
 ## 🎯 Fonctionnalités
 
 - **318 missions**, 25 catégories, de `pwd` au reverse engineering.
-- **113 missions dans un vrai shell** : tes commandes s'exécutent réellement, la validation se fait sur le résultat.
+- **145 missions dans un vrai shell** : tes commandes s'exécutent réellement, la validation se fait sur le résultat.
 - **Progression & grades** : XP, 8 rangs (de *Newbie* à *Legend*), catégories qui se débloquent au fil de l'eau.
 - **Enchaînement fluide** : après une réussite, tu passes à la mission suivante ou au niveau suivant sans repasser par le menu.
 - **Indices** (`hint`), **cheatsheet** intégrée, **carte de progression**, **statistiques** détaillées.
@@ -108,15 +108,18 @@ Sans Docker, le jeu fonctionne quand même : ces missions passent en **mode text
 
 | Domaine | Catégories | Vrai shell |
 |---|---|:---:|
-| **Linux** | Navigation, Fichiers, Texte, Permissions, Processus, Archives, Système, Scripting, Avancé | 💻 |
+| **Linux** | Navigation, Fichiers, Texte, Permissions, Processus, **Réseau**, Archives, Système, Scripting, Avancé | 💻 |
 | **Forensics** | exiftool, binwalk, steghide, foremost, tshark, YARA, entropie | 💻 |
 | **Reverse** | strings, strace, ltrace, gdb, checksec (sur un crackme) | 💻 |
+| **Réseau & scan** | nmap, curl, ssh, netcat, dig (services locaux démarrés par mission) | 💻 |
+| **Web** | énumération (gobuster, ffuf, dirb), SQLi manuelle (contre un mini-site local) | 💻 |
+| **Mots de passe** | hashid, john (md5crypt), fcrackzip (hash et ZIP réels) | 💻 |
 | **Post-exploitation** | SUID, crontab, credentials dans l'environnement | 💻 |
-| **Recon & réseau** | Nmap, Web recon, OSINT | 📝 texte |
-| **Attaques** | Web (SQLi, XSS, SSTI…), mots de passe, exploitation | 📝 texte |
-| **Spécialisé** | Active Directory, PWN, WiFi, crypto, jail escape | 📝 texte |
+| **Spécialisé** | OSINT, exploitation, Active Directory, PWN, WiFi, crypto, jail escape | 📝 texte |
 
-> Les catégories en mode texte demandent une **cible réseau**, du **matériel** (WiFi), un **Windows** (Active Directory) ou **Internet** : impossibles dans un conteneur isolé. Elles restent jouables en comparant la commande attendue.
+> Les labos réseau lancent de **vrais services** (web, ssh, dns) sur la **boucle locale** du conteneur : nmap, curl, ssh ou john s'exécutent réellement, sans que le conteneur ait jamais accès à Internet (`--network none`).
+>
+> Les catégories en mode texte demandent une **vraie cible distante**, du **matériel** (WiFi), un **Windows** (Active Directory) ou **Internet** : impossibles dans un conteneur isolé. Elles restent jouables en comparant la commande attendue.
 
 ---
 

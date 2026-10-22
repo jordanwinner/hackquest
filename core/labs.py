@@ -40,7 +40,7 @@ LABS = {
                "solution": "find /etc -type d"},
     "nav_11": {"checks": [{"out": "/usr/local/bin/backup-tool"}],
                "solution": "find / -perm -4000 2>/dev/null"},
-    "nav_12": {"checks": [{"re": r"^/"}], "solution": "locate credentials"},
+    "nav_12": {"checks": [{"out": "/opt/backup/.old/credentials.txt"}], "solution": "locate credentials"},
 
     # ── Fichiers ─────────────────────────────────────────────────────────
     "fil_01": {"checks": [{"out": "FLAG{premier_fichier_lu}"}], "solution": "cat note.txt"},
@@ -198,7 +198,7 @@ LABS = {
     "for_07": {"cwd": "/home/hacker/forensics",
                "checks": [{"out": "query"}], "solution": "tshark -r capture.pcap"},
     "for_08": {"cwd": "/home/hacker/forensics",
-               "checks": [{"out": "FLAG-exfiltration"}], "solution": "tshark -r capture.pcap"},
+               "checks": [{"out": "FLAG{http_creds_captures}"}], "solution": "tshark -r capture_http.pcap"},
     "for_12": {"cwd": "/home/hacker/forensics",
                "checks": [{"out": "Backdoor_Detectee"}], "solution": "yara rules.yar suspect.exe"},
     "for_13": {"cwd": "/home/hacker/forensics",
@@ -222,6 +222,87 @@ LABS = {
     "postex_04": {"checks": [{"out": "/opt/backup/run.sh"}], "solution": "crontab -l"},
     "postex_05": {"env": {"DB_PASSWORD": "FLAG{creds_dans_env}"},
                   "checks": [{"out": "FLAG{creds_dans_env}"}], "solution": "env | grep -i pass"},
+
+    # ══════════════════════════════════════════════════════════════════════
+    #  Labos réseau : services locaux (127.0.0.1), conteneur toujours sans réseau.
+    #  setup_root démarre les services nécessaires (web, ssh, dns).
+    # ══════════════════════════════════════════════════════════════════════
+    # ── Réseau Linux ─────────────────────────────────────────────────────
+    "net_01": {"checks": [{"out": "127.0.0.1"}], "solution": "ip a"},
+    "net_02": {"solution": "ip r"},
+    "net_06": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m",
+               "checks": [{"out": ":80"}, {"out": ":22"}], "solution": "ss -tulpn"},
+    "net_07": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m",
+               "checks": [{"out": "LISTEN"}], "solution": "ss -ta"},
+    "net_08": {"setup_root": "/opt/hq/svc dns", "memory": "512m",
+               "checks": [{"out": "10.10.10.5"}], "solution": "dig srv-target.corp"},
+    "net_11": {"setup_root": "/opt/hq/svc web", "memory": "512m",
+               "checks": [{"out": "srv-target"}], "solution": "curl http://127.0.0.1/"},
+    "net_12": {"setup_root": "/opt/hq/svc web", "memory": "512m",
+               "checks": [{"out": "Apache"}], "solution": "curl -I http://127.0.0.1/"},
+    "net_13": {"setup_root": "/opt/hq/svc web", "memory": "512m",
+               "checks": [{"out": "FLAG{post_envoye}"}], "solution": "curl -X POST http://127.0.0.1/login"},
+    "net_14": {"setup_root": "/opt/hq/svc web", "memory": "512m",
+               "checks": [{"out": "srv-target"}], "solution": "curl -H 'X-Forwarded-For: 127.0.0.1' http://127.0.0.1/"},
+    "net_15": {"setup_root": "/opt/hq/svc web", "memory": "512m", "cwd": "/tmp",
+               "checks": [{"out": "robots.txt"}], "solution": "wget http://127.0.0.1/robots.txt"},
+    "net_17": {"setup_root": "/opt/hq/svc ssh", "memory": "512m",
+               "checks": [{"out": "succeeded"}], "solution": "nc -zv 127.0.0.1 22"},
+    "net_19": {"setup_root": "/opt/hq/svc ssh", "memory": "512m",
+               "checks": [{"out": "hacker"}], "solution": "ssh -o BatchMode=yes srv-target whoami"},
+    "net_20": {"setup_root": "/opt/hq/svc ssh", "memory": "512m",
+               "checks": [{"out": "hacker"}],
+               "solution": "ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes srv-target id"},
+    "net_22": {"cwd": "/tmp", "checks": [{"test": "[ -f /tmp/hq_key ]"}],
+               "solution": "ssh-keygen -t ed25519 -N '' -f /tmp/hq_key"},
+    "net_23": {"solution": "ip neigh"},
+
+    # ── Nmap Mastery (scan TCP connect de la boucle locale) ──────────────
+    "nmap_01": {"setup_root": "/opt/hq/svc web ssh dns", "memory": "512m", "timeout": 30,
+                "checks": [{"out": "22/tcp"}], "solution": "nmap 127.0.0.1"},
+    "nmap_02": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m", "timeout": 60,
+                "checks": [{"out": "OpenSSH"}, {"out": "Apache"}], "solution": "nmap -sV 127.0.0.1"},
+    "nmap_03": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m", "timeout": 60,
+                "checks": [{"out": "22/tcp"}], "solution": "nmap -sC 127.0.0.1"},
+    "nmap_04": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m", "timeout": 90,
+                "checks": [{"out": "22/tcp"}], "solution": "nmap -A 127.0.0.1"},
+    "nmap_07": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m", "timeout": 30,
+                "checks": [{"out": "80/tcp"}], "solution": "nmap -p 22,80 127.0.0.1"},
+    "nmap_10": {"timeout": 20, "checks": [{"out": "Host is up"}], "solution": "nmap -sn 127.0.0.1"},
+    "nmap_11": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m", "timeout": 30,
+                "checks": [{"out": "open"}], "solution": "nmap -Pn 127.0.0.1"},
+    "nmap_12": {"setup_root": "/opt/hq/svc web ssh", "memory": "512m", "timeout": 30,
+                "checks": [{"out": "open"}], "solution": "nmap -T4 127.0.0.1"},
+    "nmap_15": {"setup_root": "/opt/hq/svc ssh", "memory": "512m", "timeout": 30, "cwd": "/tmp",
+                "checks": [{"test": "[ -s /tmp/scan.txt ]"}], "solution": "nmap -oN /tmp/scan.txt 127.0.0.1"},
+
+    # ── Reconnaissance Web (contre le mini-site local) ───────────────────
+    "wrecon_01": {"setup_root": "/opt/hq/svc web", "memory": "512m", "timeout": 30,
+                  "checks": [{"out": "secret"}],
+                  "solution": "gobuster dir -u http://127.0.0.1 -w /opt/hq/wordlist.txt -q"},
+    "wrecon_03": {"setup_root": "/opt/hq/svc web", "memory": "512m", "timeout": 30,
+                  "checks": [{"out": "secret"}],
+                  "solution": "ffuf -u http://127.0.0.1/FUZZ -w /opt/hq/wordlist.txt -s"},
+    "wrecon_06": {"setup_root": "/opt/hq/svc web", "memory": "512m", "timeout": 30,
+                  "checks": [{"out": "secret"}],
+                  "solution": "dirb http://127.0.0.1/ /opt/hq/wordlist.txt -S"},
+    "wrecon_09": {"setup_root": "/opt/hq/svc web", "memory": "512m",
+                  "checks": [{"out": "Apache"}], "solution": "curl -I http://127.0.0.1/"},
+
+    # ── Attaques Web (SQLi manuelle via curl contre le login local) ──────
+    "watk_04": {"setup_root": "/opt/hq/svc web", "memory": "512m",
+                "checks": [{"out": "FLAG{sqli_authentification_contournee}"}],
+                "solution": "curl -G http://127.0.0.1/login --data-urlencode user=admin "
+                            "--data-urlencode \"password=' OR '1'='1\""},
+
+    # ── Attaques Mots de Passe (hash faibles, cassage en quelques secondes) ─
+    "pass_01": {"cwd": "/home/hacker/crack", "checks": [{"out": "MD5"}],
+                "solution": "hashid 5f4dcc3b5aa765d61d8327deb882cf99"},
+    "pass_07": {"cwd": "/home/hacker/crack", "timeout": 60, "checks": [{"out": "letmein"}],
+                "solution": "john --format=md5crypt --wordlist=wordlist.txt hashes.txt; "
+                            "john --show hashes.txt"},
+    "pass_08": {"cwd": "/home/hacker/crack", "timeout": 60, "checks": [{"out": "letmein"}],
+                "solution": "fcrackzip -u -D -p wordlist.txt secret.zip"},
 }
 
 # Indice contextuel affiché au début de chaque labo (où chercher)
@@ -242,8 +323,26 @@ WHERE = {
     "for_01": "forensics/photo.png", "for_02": "forensics/firmware.bin",
     "for_03": "forensics/malware.bin", "for_05": "forensics/secret.bmp (phrase : hackquest)",
     "for_06": "forensics/disk.img", "for_07": "forensics/capture.pcap",
-    "for_08": "forensics/capture.pcap", "for_12": "forensics/rules.yar + suspect.exe",
+    "for_08": "forensics/capture_http.pcap", "for_12": "forensics/rules.yar + suspect.exe",
     "for_13": "forensics/encrypted.bin",
     "rev_01": "reverse/crackme", "rev_02": "reverse/crackme", "rev_03": "reverse/crackme",
     "rev_04": "reverse/crackme", "rev_05": "reverse/crackme",
+    # cibles locales des labos réseau (le conteneur reste sans accès Internet)
+    "net_06": "services locaux : ports 22 (ssh) et 80 (web)",
+    "net_07": "services locaux en écoute", "net_08": "résolveur local — srv-target.corp",
+    "net_11": "serveur web local : http://127.0.0.1/", "net_12": "http://127.0.0.1/",
+    "net_13": "http://127.0.0.1/login", "net_14": "http://127.0.0.1/",
+    "net_15": "http://127.0.0.1/robots.txt", "net_17": "service ssh sur 127.0.0.1:22",
+    "net_19": "hôte srv-target (= 127.0.0.1), clé déjà en place dans ~/.ssh",
+    "net_20": "clé ~/.ssh/id_ed25519 vers srv-target",
+    "nmap_01": "cible : 127.0.0.1", "nmap_02": "cible : 127.0.0.1", "nmap_03": "cible : 127.0.0.1",
+    "nmap_04": "cible : 127.0.0.1", "nmap_07": "cible : 127.0.0.1", "nmap_10": "cible : 127.0.0.1",
+    "nmap_11": "cible : 127.0.0.1", "nmap_12": "cible : 127.0.0.1", "nmap_15": "cible : 127.0.0.1",
+    "wrecon_01": "http://127.0.0.1 · wordlist : /opt/hq/wordlist.txt",
+    "wrecon_03": "http://127.0.0.1/FUZZ · wordlist : /opt/hq/wordlist.txt",
+    "wrecon_06": "http://127.0.0.1/ · wordlist : /opt/hq/wordlist.txt",
+    "wrecon_09": "http://127.0.0.1/",
+    "watk_04": "formulaire http://127.0.0.1/login (paramètres user & password)",
+    "pass_01": "crack/hash.txt", "pass_07": "crack/hashes.txt + crack/wordlist.txt",
+    "pass_08": "crack/secret.zip + crack/wordlist.txt",
 }

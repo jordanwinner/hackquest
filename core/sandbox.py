@@ -114,7 +114,7 @@ class Lab:
             "run", "-d", "--rm", "--name", self.name, "--label", LABEL,
             "--network", "none", "--hostname", "srv-target",
             "--security-opt", "no-new-privileges",
-            "--memory", "256m", "--pids-limit", "256", "--cpus", "1",
+            "--memory", self.spec.get("memory", "256m"), "--pids-limit", "256", "--cpus", "1",
             image_tag(),
         )
         if res.returncode != 0:
@@ -226,25 +226,25 @@ class Lab:
 
     def run(self, command, echo=True, timeout=None):
         """Exécute une commande dans le shell persistant.
-        Renvoie (code_retour, sortie, interrompue)."""
+        Renvoie (code_retour, sortie, arrêt) ; arrêt vaut None, "timeout" ou "ctrl-c"."""
         # stdin fermé : une commande qui attend une saisie (cat sans argument...) ne bloque pas le shell
         self._reset_reader()
         self._send(f"{{ {command}\n}} </dev/null 2>&1; __hq=$?; echo; echo \"{self.marker}$__hq:$PWD\"\n")
-        interrupted = False
+        interrupted = None
         try:
             out, tail = self._read_until_marker(timeout or self.timeout, echo)
-        except (TimeoutError, KeyboardInterrupt):
-            interrupted = True
+        except (TimeoutError, KeyboardInterrupt) as e:
+            interrupted = "ctrl-c" if isinstance(e, KeyboardInterrupt) else "timeout"
             self._kill_children()
             try:
                 out, tail = self._read_until_marker(3, echo)
             except (TimeoutError, KeyboardInterrupt):
                 self._restart_shell()
-                return 130, "", True
+                return 130, "", interrupted
         except ShellError:
             # `exit` tape par le joueur : on rouvre un shell au même endroit
             self._restart_shell()
-            return 0, "", False
+            return 0, "", None
         code, _, cwd = tail.partition(":")
         self.cwd = cwd or self.cwd
         return int(code) if code.isdigit() else 1, out, interrupted

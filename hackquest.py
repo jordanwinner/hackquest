@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.player import Player, LEVELS, SaveCorrupted, SAVE_FILE
 from core.ui import *
-from core.game import show_categories, show_missions, run_mission
+from core.game import show_categories, show_missions, run_mission, _category_of
 from core.registry import ALL_MISSIONS as MISSIONS, count_total_missions
 
 
@@ -63,6 +63,10 @@ def main_menu(player):
                     if action == "list":
                         action = show_missions(player, cat_id, cat_data)
                     else:
+                        # la mission suivante peut être dans la catégorie d'après :
+                        # la liste à réafficher ensuite est celle de cette catégorie
+                        cat_id = _category_of(action["id"]) or cat_id
+                        cat_data = MISSIONS[cat_id]
                         action = run_mission(player, action)
 
         elif choice == "2":
@@ -360,7 +364,7 @@ def first_launch(player):
     slow_print(f"  → Tu gagnes des XP et tu débloques de nouveaux niveaux.", delay=0.02)
     slow_print(f"  → Tape 'hint' si tu bloques (coûte 5 XP).", delay=0.02)
     print()
-    name = prompt("Entre ton pseudo de hacker")
+    name = prompt("Entre ton pseudo de hacker :")
     if name and name != "quit":
         player.name = name
     player.save()

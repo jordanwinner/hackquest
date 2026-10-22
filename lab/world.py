@@ -56,6 +56,21 @@ def make_dns_pcap(qname):
     return gheader + pheader + pkt
 
 
+def make_http_pcap(request_line, host="srv-target.corp"):
+    """Une capture d'une seule requête HTTP (un segment TCP vers le port 80).
+    tshark -r la dissèque en HTTP : la ligne de requête (avec l'URI) apparaît."""
+    payload = (f"{request_line}\r\nHost: {host}\r\n"
+               "User-Agent: curl/8.0\r\nAccept: */*\r\n\r\n").encode()
+    tcp = struct.pack(">HHIIBBHHH", 44000, 80, 1000, 0, 0x50, 0x18, 64240, 0, 0) + payload
+    ip = struct.pack(">BBHHHBBH4s4s", 0x45, 0, 20 + len(tcp), 0x2a2a, 0x4000, 64, 6, 0,
+                     bytes([10, 0, 0, 77]), bytes([10, 10, 10, 5]))
+    eth = b"\x52\x54\x00\x12\x34\x56\x52\x54\x00\x65\x43\x21\x08\x00"
+    pkt = eth + ip + tcp
+    gheader = struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1)
+    pheader = struct.pack("<IIII", 0, 0, len(pkt), len(pkt))
+    return gheader + pheader + pkt
+
+
 def sh(*cmd):
     subprocess.run(cmd, check=True)
 
@@ -266,8 +281,12 @@ os.remove(f"{F}/message.txt")                                                   
 write(f"{F}/disk.img", random.randbytes(100_000) + make_png(80, 80)
                        + random.randbytes(50_000))
 
-# for_07 / for_08 : tshark — une requête DNS qui exfiltre un flag
+# for_07 : tshark — une requête DNS qui exfiltre un flag
 write(f"{F}/capture.pcap", make_dns_pcap("FLAG-exfiltration.evil.corp"))
+
+# for_08 : tshark — des credentials en clair dans une requête HTTP GET
+write(f"{F}/capture_http.pcap",
+      make_http_pcap("GET /login?user=admin&password=FLAG{http_creds_captures} HTTP/1.1"))
 
 # for_12 : yara — règle de détection + fichier suspect
 write(f"{F}/rules.yar", 'rule Backdoor_Detectee {\n'
@@ -287,5 +306,134 @@ write("/usr/local/bin/entropy", "#!/usr/bin/env python3\n"
       "    print(f'{f}: {e:.2f} bits/octet')\n", 0o755)
 write(f"{F}/encrypted.bin", random.randbytes(50_000))                              # entropie ~8
 
+# ══════════════════════════════════════════════════════════════════════════
+#  Services réseau locaux (127.0.0.1) : démarrés le temps d'une mission.
+#  Le conteneur reste sans réseau ; tout se passe en boucle locale.
+# ══════════════════════════════════════════════════════════════════════════
+os.makedirs("/opt/hq", exist_ok=True)
+
+# ── Mini-site web volontairement vulnérable (simulation pédagogique) ──────
+#   · plusieurs chemins « cachés » → énumération (gobuster/ffuf/dirb)
+#   · un faux login contournable → SQLi manuelle via curl
+#   · un en-tête Server identifiable → reconnaissance
+write("/opt/hq/web.py", r'''#!/usr/bin/env python3
+"""Serveur d'entraînement HackQuest — 100% local, aucune vraie base de données.
+Les « failles » sont scriptées pour l'apprentissage : rien n'est réellement exploitable."""
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
+
+PAGES = {
+    "/": "<h1>srv-target</h1><p>Portail interne. Voir /robots.txt</p>",
+    "/robots.txt": "User-agent: *\nDisallow: /admin\nDisallow: /backup\nDisallow: /secret",
+    "/admin": "<h1>Zone admin</h1><form action=/login><input name=user><input name=password></form>",
+    "/backup": "<h1>Sauvegardes</h1><a href=/backup/dump.sql>dump.sql</a>",
+    "/config.php": "<!-- TODO: retirer les identifiants de debug -->",
+    "/secret": "<h1>Zone secrete</h1>FLAG{repertoire_cache_trouve}",
+}
+
+class H(BaseHTTPRequestHandler):
+    server_version = "Apache/2.4.52"
+    sys_version = "(Debian)"
+    def log_message(self, *a): pass
+    def _send(self, code, body):
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("X-Powered-By", "PHP/7.4.3")
+        self.end_headers()
+        self.wfile.write(body.encode())
+    def do_GET(self):
+        u = urlparse(self.path)
+        if u.path == "/login":
+            q = parse_qs(u.query)
+            user = (q.get("user") or [""])[0]
+            pw = (q.get("password") or q.get("pass") or [""])[0]
+            inj = "' or '1'='1"
+            if inj in user.lower() or inj in pw.lower() or "or 1=1" in (user + pw).lower():
+                return self._send(200, "Authentification contournee ! FLAG{sqli_authentification_contournee}")
+            return self._send(403, "Identifiants invalides.")
+        if u.path in PAGES:
+            return self._send(200, PAGES[u.path])
+        self._send(404, "Not Found")
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(length)
+        self._send(200, "Requete POST recue. FLAG{post_envoye}")
+
+HTTPServer(("127.0.0.1", 80), H).serve_forever()
+''', 0o755)
+
+# ── Liste de mots pour l'énumération et le cassage (petite = cassage rapide) ──
+WORDS = ["admin", "login", "backup", "secret", "config.php", "robots.txt", "index",
+         "images", "uploads", "test", "old", "dev", "api",
+         "password", "letmein", "hunter2", "azerty", "dragon", "qwerty",
+         "root", "toor", "admin123", "Winter2026!", "P4ssw0rd"]
+write("/opt/hq/wordlist.txt", lines(WORDS))
+
+# ── Lanceur de services (appelé en root au début des missions concernées) ──
+write("/opt/hq/svc", r'''#!/bin/bash
+# usage: svc web ssh dns   — démarre les services demandés et attend qu'ils répondent
+wait_port() { for _ in $(seq 1 50); do (echo >/dev/tcp/127.0.0.1/$1) 2>/dev/null && return; sleep 0.1; done; }
+for s in "$@"; do case "$s" in
+  web) pgrep -f /opt/hq/web.py >/dev/null || nohup python3 /opt/hq/web.py >/var/log/hqweb.log 2>&1 &
+       wait_port 80 ;;
+  ssh) mkdir -p /run/sshd
+       pgrep -f "sshd.*Port=22" >/dev/null || /usr/sbin/sshd \
+         -o Port=22 -o ListenAddress=127.0.0.1 \
+         -o PasswordAuthentication=no -o PubkeyAuthentication=yes \
+         -o UsePAM=no -o StrictModes=no
+       wait_port 22 ;;
+  dns) pgrep -x dnsmasq >/dev/null || dnsmasq --user=root --listen-address=127.0.0.1 --bind-interfaces \
+         --no-resolv --no-hosts \
+         --address=/srv-target.corp/10.10.10.5 \
+         --address=/mail.srv-target.corp/10.10.10.9 \
+         --address=/vpn.srv-target.corp/10.10.10.20
+       echo "nameserver 127.0.0.1" > /etc/resolv.conf ;;
+esac; done
+''', 0o755)
+
+# ── sshd : login par clé de hacker vers localhost (net_19/20) ──────────────
+write("/etc/ssh/sshd_config.d/hq.conf", lines([
+    "Port 22", "ListenAddress 127.0.0.1",
+    "PermitRootLogin no", "PasswordAuthentication no", "PubkeyAuthentication yes",
+    "UsePAM no",
+]))
+# le compte hacker est créé verrouillé (pas de mot de passe) : on le déverrouille
+# pour que l'authentification par clé fonctionne (l'auth par mot de passe reste coupée)
+sh("bash", "-c", "echo 'hacker:hackquest2026' | chpasswd")
+os.makedirs(f"{H}/.ssh", exist_ok=True)
+sh("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", f"{H}/.ssh/id_ed25519")
+with open(f"{H}/.ssh/id_ed25519.pub") as f:
+    pub = f.read()
+write(f"{H}/.ssh/authorized_keys", pub)
+write(f"{H}/.ssh/config", lines([
+    "Host srv-target localhost 127.0.0.1",
+    "    HostName 127.0.0.1",
+    "    User hacker",
+    "    StrictHostKeyChecking no",
+    "    UserKnownHostsFile /dev/null",
+    "    LogLevel ERROR",
+]))
+
+# ── Artefacts à casser (mots de passe) — volontairement faibles et locaux ──
+os.makedirs(f"{H}/crack", exist_ok=True)
+# pass_01 : identifier un hash — MD5 de "password"
+write(f"{H}/crack/hash.txt", "5f4dcc3b5aa765d61d8327deb882cf99\n")
+# pass_07 : john sur des hash md5crypt ($1$) dont le clair est dans la wordlist
+#   (la version « core » de john en dépôt ne gère pas raw-md5, mais gère md5crypt)
+_targets = ["letmein", "hunter2", "dragon"]
+_hashes = [subprocess.run(["openssl", "passwd", "-1", w], capture_output=True, text=True).stdout.strip()
+           for w in _targets]
+write(f"{H}/crack/hashes.txt", lines(f"user{i}:{h}" for i, h in enumerate(_hashes)))
+write(f"{H}/crack/wordlist.txt", lines(WORDS))
+# pass_08 : archive ZIP protégée (mot de passe « letmein », présent dans la wordlist)
+_zc = f"{H}/crack/_flag.txt"
+write(_zc, "FLAG{zip_casse_au_dictionnaire}\n")
+subprocess.run(["zip", "-q", "-j", "--password", "letmein", f"{H}/crack/secret.zip", _zc], check=True)
+os.remove(_zc)
+
 sh("chown", "-R", "hacker:hacker", H)
 sh("chown", "hacker:hacker", "/usr/local/bin")                                     # fil_19 : ln -s dans /usr/local/bin
+# perms SSH strictes (sinon le client/daemon refusent les clés)
+os.chmod(f"{H}/.ssh", 0o700)
+os.chmod(f"{H}/.ssh/id_ed25519", 0o600)
+os.chmod(f"{H}/.ssh/authorized_keys", 0o600)
