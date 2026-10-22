@@ -5,6 +5,7 @@ from core.ui import *  # header, banner, clear, couleurs, prompt...
 from core.validate import is_valid_answer, same_tool
 from core.labs import LABS, WHERE
 from core import sandbox
+from core.simulate import simulated_output
 
 # filet de sécurité : à la fin du jeu, s'assurer qu'aucun conteneur de labo ne traîne
 atexit.register(sandbox.cleanup_stale)
@@ -245,19 +246,21 @@ def _after_mission(player, mission):
     return nxt if nxt else "list"
 
 
-def run_mission(player, mission):
-    """Lance une mission : dans le bac à sable si elle a un labo, sinon en mode texte."""
+def run_mission(player, mission, chain=True):
+    """Lance une mission : dans le bac à sable si elle a un labo, sinon en mode texte.
+    chain=False (mode campagne) : à la réussite, renvoie 'done' au lieu du menu
+    'Et maintenant ?' ; back renvoie 'abort', skip renvoie 'skip'."""
     spec = LABS.get(mission["id"])
     if spec and _lab_ready(player):
         try:
-            return run_lab_mission(player, mission, spec)
+            return run_lab_mission(player, mission, spec, chain=chain)
         except sandbox.ShellError as e:
             error(f"Le labo n'a pas pu démarrer ({e}). On passe en mode texte.")
             press_enter()
-    return run_text_mission(player, mission)
+    return run_text_mission(player, mission, chain=chain)
 
 
-def run_text_mission(player, mission):
+def run_text_mission(player, mission, chain=True):
     """Mode texte : la commande tapée est comparée à la réponse attendue."""
     already_done = mission["id"] in player.completed_missions
     hint_index = 0
@@ -283,12 +286,12 @@ def run_text_mission(player, mission):
 
         # ── Commandes spéciales ──
         if cmd in ("back", "b", "retour", "q", "quit"):
-            return "list"
+            return "abort" if not chain else "list"
 
         if cmd in ("skip", "passer"):
             warning("Mission passée.")
             press_enter()
-            return "list"
+            return "skip" if not chain else "list"
 
         if cmd == "hint":
             hint_index = _hint(player, mission, hint_index)
@@ -297,8 +300,11 @@ def run_text_mission(player, mission):
 
         # ── Validation de la commande ──
         if is_valid_answer(user_input, mission):
+            sample = simulated_output(user_input)
+            if sample:
+                print(f"\n{sample}")
             _complete(player, mission, already_done)
-            return _after_mission(player, mission)
+            return "done" if not chain else _after_mission(player, mission)
 
         error(f"Ce n'est pas tout à fait ça... Tape 'hint' si tu bloques.")
         press_enter()
@@ -387,7 +393,7 @@ def _lab_help(has_flag=False):
           f"clear · skip · back (ou Ctrl+D){RESET}{extra}\n")
 
 
-def run_lab_mission(player, mission, spec):
+def run_lab_mission(player, mission, spec, chain=True):
     """Bac à sable : les commandes s'exécutent pour de vrai dans un conteneur jetable,
     et la mission est validée sur le résultat (flag trouvé, fichier créé, bon dossier...)."""
     already_done = mission["id"] in player.completed_missions
@@ -419,11 +425,11 @@ def run_lab_mission(player, mission, spec):
 
             # ── Commandes du jeu ──
             if word in ("back", "retour", "quit"):
-                return "list"
+                return "abort" if not chain else "list"
             if word in ("skip", "passer"):
                 warning("Mission passée.")
                 press_enter()
-                return "list"
+                return "skip" if not chain else "list"
             if word == "hint":
                 hint_index = _hint(player, mission, hint_index)
                 print()
@@ -448,7 +454,7 @@ def run_lab_mission(player, mission, spec):
                 if verdict == "ok":
                     print(f"{GREEN}  🚩 Flag correct !{RESET}")
                     _complete(player, mission, already_done)
-                    return _after_mission(player, mission)
+                    return "done" if not chain else _after_mission(player, mission)
                 if verdict == "ko":
                     print(f"{RED}  🚩 Mauvais flag. Relis la sortie de ta commande.{RESET}")
                     continue
@@ -476,7 +482,7 @@ def run_lab_mission(player, mission, spec):
                           f"{BOLD}Soumets-le pour valider{RESET}{GREEN} (tape-le directement).{RESET}")
                 else:
                     _complete(player, mission, already_done)
-                    return _after_mission(player, mission)
+                    return "done" if not chain else _after_mission(player, mission)
             elif right_command:
                 print(f"{YELLOW}  ↳ Bonne commande, mais l'objectif n'est pas encore atteint "
                       f"(mauvais fichier ? mauvais dossier ?). Tape 'objectif' ou 'hint'.{RESET}")

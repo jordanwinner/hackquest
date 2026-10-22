@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.player import Player, LEVELS, SaveCorrupted, SAVE_FILE
 from core.ui import *
 from core.game import show_categories, show_missions, run_mission, _category_of
+from core.campaign import play_campaign
 from core.registry import ALL_MISSIONS as MISSIONS, count_total_missions
 
 
@@ -42,10 +43,11 @@ def main_menu(player):
         separator()
         print(f"""
   {CYAN}{BOLD}[1]{RESET}  🎮  Jouer — Choisir une mission
-  {CYAN}{BOLD}[2]{RESET}  📊  Mes statistiques
-  {CYAN}{BOLD}[3]{RESET}  📖  Guide des commandes (cheatsheet)
-  {CYAN}{BOLD}[4]{RESET}  🗺️   Carte de progression
-  {CYAN}{BOLD}[5]{RESET}  ⚙️   Paramètres
+  {MAGENTA}{BOLD}[2]{RESET}  🎯  Campagne — Opération Nightfall
+  {CYAN}{BOLD}[3]{RESET}  📊  Mes statistiques
+  {CYAN}{BOLD}[4]{RESET}  📖  Guide des commandes (cheatsheet)
+  {CYAN}{BOLD}[5]{RESET}  🗺️   Carte de progression
+  {CYAN}{BOLD}[6]{RESET}  ⚙️   Paramètres
   {DIM}[0]  Quitter{RESET}
 """)
         separator()
@@ -70,15 +72,18 @@ def main_menu(player):
                         action = run_mission(player, action)
 
         elif choice == "2":
-            show_stats(player)
+            play_campaign(player)
 
         elif choice == "3":
-            show_cheatsheet()
+            show_stats(player)
 
         elif choice == "4":
-            show_progress_map(player)
+            show_cheatsheet()
 
         elif choice == "5":
+            show_progress_map(player)
+
+        elif choice == "6":
             show_settings(player)
 
         elif choice == "0" or choice.lower() == "quit":
