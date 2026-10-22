@@ -1,8 +1,13 @@
+import atexit
+
 from core.registry import ALL_MISSIONS as MISSIONS, PROGRESSION_ORDER
 from core.ui import *  # header, banner, clear, couleurs, prompt...
 from core.validate import is_valid_answer, same_tool
 from core.labs import LABS, WHERE
 from core import sandbox
+
+# filet de sécurité : à la fin du jeu, s'assurer qu'aucun conteneur de labo ne traîne
+atexit.register(sandbox.cleanup_stale)
 
 def show_categories(player):
     """Affiche les catégories disponibles et verrouillées."""
@@ -100,7 +105,7 @@ def _lab_ready(player):
     """True si la mission peut se jouer dans le bac à sable (Docker + image prête)."""
     if not getattr(player, "sandbox", True) or _session["declined"]:
         return False
-    if not sandbox.docker_available(on_msg=lambda s: print(f"  {DIM}⚙  {s}{RESET}", flush=True)):
+    if not sandbox.docker_available():
         if not _session["docker_warned"]:
             warning("Docker est indisponible : les missions 💻 se jouent en mode texte.")
             print(f"  {DIM}Installe Docker et ajoute-toi au groupe docker pour le vrai shell.{RESET}")
