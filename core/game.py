@@ -117,7 +117,8 @@ def _lab_ready(player):
     print(f"{BOLD}  💻 Le labo n'est pas encore construit{RESET}\n")
     print("  Les missions 💻 se jouent dans un vrai shell, sur un faux serveur isolé")
     print("  (conteneur Docker sans réseau, détruit après chaque mission).")
-    print(f"  Il faut le construire une fois : ~700 Mo, quelques minutes, connexion requise.\n")
+    print(f"  Il faut le construire une fois : ~830 Mo, quelques minutes, connexion requise.")
+    print(f"  {DIM}(Sur Mac Apple Silicon, cette 1re construction est plus longue — c'est normal.){RESET}\n")
     if prompt("Construire maintenant ? [O/n]").lower() in ("n", "non", "quit"):
         _session["declined"] = True
         info("Mode texte pour cette session (réglable dans ⚙️ Paramètres).")

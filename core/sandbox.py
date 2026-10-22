@@ -62,13 +62,23 @@ def image_ready():
     return _docker("image", "inspect", image_tag()).returncode == 0
 
 
-def build_image(on_line=print):
-    """Construit l'image (une seule fois). Renvoie True si tout s'est bien passé."""
-    proc = subprocess.Popen(["docker", "build", "-t", image_tag(), LAB_DIR],
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    for line in proc.stdout:
-        on_line(line.rstrip())
-    return proc.wait() == 0
+PLATFORM = "linux/amd64"  # binaires et adresses PWN x86-64 : même archi partout
+
+
+def build_image(on_line=print, attempts=2):
+    """Construit l'image (une seule fois). Réessaie une fois en cas d'échec réseau.
+    Renvoie True si tout s'est bien passé."""
+    for attempt in range(1, attempts + 1):
+        proc = subprocess.Popen(
+            ["docker", "build", "--platform", PLATFORM, "-t", image_tag(), LAB_DIR],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        for line in proc.stdout:
+            on_line(line.rstrip())
+        if proc.wait() == 0:
+            return True
+        if attempt < attempts:
+            on_line(f"… échec de construction, nouvelle tentative ({attempt + 1}/{attempts})…")
+    return False
 
 
 def cleanup_stale():
@@ -112,6 +122,7 @@ class Lab:
     def start(self):
         res = _docker(
             "run", "-d", "--rm", "--name", self.name, "--label", LABEL,
+            "--platform", PLATFORM,
             "--network", "none", "--hostname", "srv-target",
             "--security-opt", "no-new-privileges",
             "--memory", self.spec.get("memory", "256m"), "--pids-limit", "256", "--cpus", "1",

@@ -40,7 +40,7 @@ echo -e "  ${BOLD}Installation de HackQuest${NC}\n"
 # ── Vérifier (et installer si besoin) Python 3
 if ! command -v python3 &>/dev/null; then
     echo -e "  ⚙  Python 3 manquant : installation..."
-    apt_install python3
+    apt_install python3 || true
     if ! command -v python3 &>/dev/null; then
         echo -e "${RED}❌ Python 3 est requis. Installe-le avec : sudo apt install python3${NC}"
         exit 1
@@ -65,7 +65,7 @@ if [ -f "$SCRIPT_DIR/hackquest.py" ]; then
 else
     if ! command -v git &>/dev/null; then
         echo -e "  ⚙  git manquant : installation..."
-        apt_install git
+        apt_install git || true
         command -v git &>/dev/null || { echo -e "${RED}❌ git est requis : sudo apt install git${NC}"; exit 1; }
     fi
     GAME_DIR="$INSTALL_DIR"
@@ -143,8 +143,24 @@ install_docker() {
     command -v docker &>/dev/null
 }
 
-if command -v docker &>/dev/null && docker info &>/dev/null; then
-    echo -e "  ${GREEN}✅ Docker détecté : les missions 💻 se joueront dans un vrai shell${NC}"
+if command -v docker &>/dev/null; then
+    if docker info &>/dev/null; then
+        echo -e "  ${GREEN}✅ Docker opérationnel : les missions 💻 se joueront dans un vrai shell${NC}"
+    else
+        # Docker est là mais injoignable : démon arrêté ou utilisateur hors du groupe
+        echo -e "  ${BOLD}⚠  Docker est installé mais injoignable${NC} (démon arrêté ou droits manquants)."
+        if [ -n "$SUDO" ]; then
+            $SUDO systemctl start docker 2>/dev/null || $SUDO service docker start 2>/dev/null || true
+            groups "$USER" 2>/dev/null | grep -qw docker || $SUDO usermod -aG docker "$USER" 2>/dev/null || true
+        fi
+        if docker info &>/dev/null; then
+            echo -e "  ${GREEN}✅ Docker démarré.${NC}"
+        else
+            echo -e "     Démarre le service : ${CYAN}sudo systemctl start docker${NC}"
+            echo -e "     Ajoute-toi au groupe : ${CYAN}sudo usermod -aG docker \$USER${NC} (puis reconnecte-toi)."
+            echo -e "     En attendant, le jeu marche en mode texte."
+        fi
+    fi
 else
     docker_done=0
     if [ "$HAS_APT" = 1 ]; then

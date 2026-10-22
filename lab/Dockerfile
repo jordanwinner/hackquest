@@ -4,10 +4,16 @@
 # Tout tourne en boucle locale (127.0.0.1) : les services réseau (web, ssh, dns)
 # sont démarrés le temps d'une mission, donc nmap/curl/ssh/john fonctionnent
 # réellement sans que le conteneur n'ait jamais accès à Internet.
-FROM python:3.12-slim
+# Image figée en linux/amd64 : les binaires fournis (crackme, vuln) et les
+# adresses des missions PWN sont x86-64, donc on force cette architecture pour
+# un comportement identique partout — y compris sur Mac Apple Silicon (Docker
+# Desktop l'émule : 1re construction plus longue, mais elle réussit).
+FROM --platform=linux/amd64 python:3.12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
+# résistance aux coupures réseau pendant l'installation des paquets
+RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "30";\n' > /etc/apt/apt.conf.d/80-hq-retries
+RUN for i in 1 2 3; do apt-get update && break || sleep 5; done \
  && apt-get install -y --no-install-recommends \
       procps psmisc tree file less xxd binutils plocate zip unzip bc \
       p7zip-full openssl rsync cron \
