@@ -65,22 +65,38 @@ ln -sf "$GAME_DIR/hackquest" "$BIN_DIR/hackquest"
 
 echo -e "  ${GREEN}✅ Commande 'hackquest' installée dans $BIN_DIR${NC}"
 
-# ── Ajouter ~/.local/bin au PATH si pas déjà dedans
-SHELL_RC=""
-if [ -f "$HOME/.zshrc" ]; then
-    SHELL_RC="$HOME/.zshrc"
-elif [ -f "$HOME/.bashrc" ]; then
-    SHELL_RC="$HOME/.bashrc"
-fi
+# ── Enregistrer ~/.local/bin dans le PATH, pour que `hackquest` soit lançable
+#    depuis n'importe où, à chaque session, sans rien retaper.
+PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 
-if [ -n "$SHELL_RC" ]; then
-    # la ligne écrite contient « $HOME » littéralement : on cherche les deux formes
-    if ! grep -qF -e "$BIN_DIR" -e '$HOME/.local/bin' "$SHELL_RC" 2>/dev/null; then
-        echo "" >> "$SHELL_RC"
-        echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
-        echo -e "  ${GREEN}✅ PATH mis à jour dans $SHELL_RC${NC}"
+add_to_path() {              # ajoute la ligne à un fichier shell existant (0 = fichier présent)
+    local rc="$1"
+    [ -f "$rc" ] || return 1
+    if ! grep -qF -e "$BIN_DIR" -e '$HOME/.local/bin' "$rc" 2>/dev/null; then
+        printf '\n# ajouté par HackQuest\n%s\n' "$PATH_LINE" >> "$rc"
+        echo -e "  ${GREEN}✅ PATH enregistré dans $rc${NC}"
     fi
-fi
+    return 0
+}
+
+SHELL_RC=""
+case ":$PATH:" in
+    *":$BIN_DIR:"*)
+        echo -e "  ${GREEN}✅ $BIN_DIR est déjà dans le PATH${NC}" ;;
+    *)
+        found=0
+        for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+            add_to_path "$rc" && found=1
+        done
+        if [ "$found" = 0 ]; then       # aucun fichier shell : on crée ~/.profile
+            printf '%s\n' "$PATH_LINE" > "$HOME/.profile"
+            echo -e "  ${GREEN}✅ PATH enregistré dans $HOME/.profile${NC}"
+        fi
+        # fichier à « sourcer » pour en profiter tout de suite
+        [ -f "$HOME/.bashrc" ] && SHELL_RC="$HOME/.bashrc"
+        [ -n "$ZSH_VERSION" ] && [ -f "$HOME/.zshrc" ] && SHELL_RC="$HOME/.zshrc"
+        ;;
+esac
 
 # ── Test rapide
 echo -e "\n  🧪 Test de démarrage..."
@@ -105,9 +121,11 @@ else
     echo -e "     (puis déconnecte-toi / reconnecte-toi). Sans Docker, le jeu marche en mode texte."
 fi
 
-echo -e "\n  Pour lancer le jeu :"
+echo -e "\n  ${BOLD}C'est prêt !${NC} Quand tu veux jouer et apprendre, tape simplement :"
+echo -e "  ${CYAN}${BOLD}hackquest${NC}"
 if [ -n "$SHELL_RC" ]; then
-    echo -e "  ${CYAN}${BOLD}  source $SHELL_RC && hackquest${NC}\n"
+    echo -e "\n  (dans ce terminal, active-le tout de suite avec : ${CYAN}source $SHELL_RC${NC})"
 else
-    echo -e "  ${CYAN}${BOLD}  hackquest${NC}\n"
+    echo -e "\n  (ouvre un nouveau terminal si la commande n'est pas encore trouvée)"
 fi
+echo
