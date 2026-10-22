@@ -100,7 +100,7 @@ def _lab_ready(player):
     """True si la mission peut se jouer dans le bac à sable (Docker + image prête)."""
     if not getattr(player, "sandbox", True) or _session["declined"]:
         return False
-    if not sandbox.docker_available():
+    if not sandbox.docker_available(on_msg=lambda s: print(f"  {DIM}⚙  {s}{RESET}", flush=True)):
         if not _session["docker_warned"]:
             warning("Docker est indisponible : les missions 💻 se jouent en mode texte.")
             print(f"  {DIM}Installe Docker et ajoute-toi au groupe docker pour le vrai shell.{RESET}")

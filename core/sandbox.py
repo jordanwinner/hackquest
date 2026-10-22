@@ -42,12 +42,58 @@ def _docker(*args, **kwargs):
 
 
 _available = None
+_daemon_started_by_us = False
 
 
-def docker_available():
+def _daemon_running():
+    return _docker("info", timeout=15).returncode == 0
+
+
+def _systemctl(*args):
+    cmd = ["systemctl", *args]
+    if os.geteuid() != 0:          # pas root : on tente sudo sans mot de passe
+        cmd = ["sudo", "-n", *cmd]
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def start_daemon(on_msg=lambda s: None):
+    """Démarre le service Docker s'il est arrêté et qu'on peut le faire.
+    Renvoie True si c'est NOUS qui l'avons démarré (il sera alors coupé en quittant)."""
+    global _daemon_started_by_us
+    if _daemon_running():
+        return False                # déjà lancé (par le système ou l'utilisateur) : on n'y touche pas
+    if not shutil.which("systemctl"):
+        return False
+    on_msg("démarrage de Docker…")
+    _systemctl("start", "docker.socket", "docker")
+    for _ in range(30):             # attendre que le daemon réponde (jusqu'à ~15 s)
+        if _daemon_running():
+            _daemon_started_by_us = True
+            atexit.register(stop_daemon)   # coupé automatiquement en fin de partie
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def stop_daemon():
+    """Arrête Docker uniquement si c'est le jeu qui l'avait démarré."""
+    global _daemon_started_by_us
+    if not _daemon_started_by_us:
+        return
+    _daemon_started_by_us = False
+    _systemctl("stop", "docker.socket", "docker")
+
+
+def docker_available(on_msg=lambda s: None):
+    """True si Docker est utilisable. Tente de démarrer le service si besoin."""
     global _available
     if _available is None:
-        _available = bool(shutil.which("docker")) and _docker("info", timeout=15).returncode == 0
+        if not shutil.which("docker"):
+            _available = False
+        elif _daemon_running() or start_daemon(on_msg):
+            _available = True
+        else:
+            _available = False
     return _available
 
 
