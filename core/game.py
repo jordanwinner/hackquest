@@ -1,4 +1,4 @@
-from core.registry import ALL_MISSIONS as MISSIONS
+from core.registry import ALL_MISSIONS as MISSIONS, PROGRESSION_ORDER
 from core.ui import *  # header, banner, clear, couleurs, prompt...
 from core.validate import is_valid_answer, same_tool
 from core.labs import LABS, WHERE
@@ -195,7 +195,52 @@ def _complete(player, mission, already_done):
     else:
         info("Mission déjà complétée — pas d'XP supplémentaire.")
 
-    press_enter()
+
+def _category_of(mid):
+    for cid, cat in MISSIONS.items():
+        if any(m["id"] == mid for m in cat["missions"]):
+            return cid
+    return None
+
+
+def _next_mission(player, mission):
+    """Mission qui suit : la suivante dans la catégorie, sinon la 1re de la
+    prochaine catégorie débloquée. Renvoie (cat_id, mission) ou (None, None)."""
+    cid = _category_of(mission["id"])
+    if cid is None:
+        return None, None
+    missions = MISSIONS[cid]["missions"]
+    idx = next(i for i, m in enumerate(missions) if m["id"] == mission["id"])
+    if idx + 1 < len(missions):
+        return cid, missions[idx + 1]
+    order = PROGRESSION_ORDER
+    for nid in order[order.index(cid) + 1:] if cid in order else []:
+        if nid in player.unlocked_categories and MISSIONS[nid]["missions"]:
+            return nid, MISSIONS[nid]["missions"][0]
+    return None, None
+
+
+def _after_mission(player, mission):
+    """Affiché après une réussite. Renvoie la mission suivante à jouer,
+    ou \"list\" (liste des missions) ou \"menu\" (menu principal)."""
+    cid, nxt = _next_mission(player, mission)
+    print()
+    separator()
+    if nxt:
+        if cid == _category_of(mission["id"]):
+            print(f"  {GREEN}{BOLD}[Entrée]{RESET} ➡  Mission suivante : {BOLD}{nxt['title']}{RESET} "
+                  f"{DIM}(+{nxt['xp']} XP){RESET}")
+        else:
+            print(f"  {GREEN}{BOLD}[Entrée]{RESET} 🆙 Niveau suivant — {MISSIONS[cid]['title']} : "
+                  f"{BOLD}{nxt['title']}{RESET}")
+    print(f"  {CYAN}[l]{RESET} 📋 Liste des missions")
+    print(f"  {DIM}[m]{RESET} 🏠 Menu principal")
+    choice = prompt("Et maintenant ?").lower()
+    if choice in ("m", "menu", "quit"):
+        return "menu"
+    if choice in ("l", "list", "liste", "back", "b"):
+        return "list"
+    return nxt if nxt else "list"
 
 
 def run_mission(player, mission):
@@ -236,12 +281,12 @@ def run_text_mission(player, mission):
 
         # ── Commandes spéciales ──
         if cmd in ("back", "b", "retour", "q", "quit"):
-            return
+            return "list"
 
         if cmd in ("skip", "passer"):
             warning("Mission passée.")
             press_enter()
-            return
+            return "list"
 
         if cmd == "hint":
             hint_index = _hint(player, mission, hint_index)
@@ -251,7 +296,7 @@ def run_text_mission(player, mission):
         # ── Validation de la commande ──
         if is_valid_answer(user_input, mission):
             _complete(player, mission, already_done)
-            return
+            return _after_mission(player, mission)
 
         error(f"Ce n'est pas tout à fait ça... Tape 'hint' si tu bloques.")
         press_enter()
@@ -306,11 +351,11 @@ def run_lab_mission(player, mission, spec):
 
             # ── Commandes du jeu ──
             if word in ("back", "retour", "quit"):
-                return
+                return "list"
             if word in ("skip", "passer"):
                 warning("Mission passée.")
                 press_enter()
-                return
+                return "list"
             if word == "hint":
                 hint_index = _hint(player, mission, hint_index)
                 print()
@@ -338,7 +383,7 @@ def run_lab_mission(player, mission, spec):
             right_command = is_valid_answer(line, mission)
             if right_command and lab.check(output, code):
                 _complete(player, mission, already_done)
-                return
+                return _after_mission(player, mission)
             if right_command:
                 print(f"{YELLOW}  ↳ Bonne commande, mais l'objectif n'est pas encore atteint "
                       f"(mauvais fichier ? mauvais dossier ?). Tape 'objectif' ou 'hint'.{RESET}")

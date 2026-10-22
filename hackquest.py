@@ -56,9 +56,14 @@ def main_menu(player):
             result = show_categories(player)
             if result:
                 cat_id, cat_data = result
-                mission = show_missions(player, cat_id, cat_data)
-                if mission:
-                    run_mission(player, mission)
+                # enchaîne les missions : après une réussite, on peut passer
+                # directement à la suivante sans repasser par le menu principal
+                action = show_missions(player, cat_id, cat_data)
+                while action and action != "menu":
+                    if action == "list":
+                        action = show_missions(player, cat_id, cat_data)
+                    else:
+                        action = run_mission(player, action)
 
         elif choice == "2":
             show_stats(player)
