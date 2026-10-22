@@ -9,9 +9,13 @@ Les missions citées existent déjà (core/labs.py) et se jouent dans le vrai sh
 quand Docker est là, sinon en mode texte. La campagne ne débloque rien de force :
 elle guide, et compléter une mission compte normalement dans la progression.
 """
+import datetime
+import os
+
 from core.ui import (clear, header, separator, press_enter, prompt, slow_print,
                      BOLD, DIM, CYAN, GREEN, YELLOW, RED, MAGENTA, RESET)
 from core.registry import get_mission_by_id
+from core.labs import LABS
 
 CAMPAIGN = {
     "title": "Opération Nightfall",
@@ -87,6 +91,87 @@ def _intro_screen(player):
     return choice not in ("m", "menu", "q", "quit")
 
 
+import re as _re
+_FLAG_RE = _re.compile(r"FLAG\{[^}]+\}")
+
+
+def _mission_flag(mid):
+    spec = LABS.get(mid, {})
+    if spec.get("flag"):
+        return spec["flag"]
+    for alt in spec.get("checks", []):
+        out = alt.get("out", [])
+        for s in (out if isinstance(out, list) else [out]):
+            m = _FLAG_RE.search(s)
+            if m:
+                return m.group(0)
+    return None
+
+
+REPORT_PATH = os.path.expanduser("~/rapport_nightfall.txt")
+
+
+def _build_report(player):
+    """Construit un rapport de pentest texte à partir des actes de la campagne."""
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    L = []
+    L.append("=" * 68)
+    L.append("  RAPPORT DE TEST D'INTRUSION — OPÉRATION NIGHTFALL")
+    L.append("=" * 68)
+    L.append(f"  Cible    : srv-target")
+    L.append(f"  Auditeur : {player.name}")
+    L.append(f"  Date     : {now}")
+    L.append("")
+    L.append("  RÉSUMÉ EXÉCUTIF")
+    L.append("  ---------------")
+    L.append("  Le serveur srv-target a été compromis de bout en bout : d'un simple")
+    L.append("  scan réseau jusqu'à l'exfiltration de données, en passant par un accès")
+    L.append("  initial applicatif et une élévation de privilèges. Détail par phase :")
+    L.append("")
+    severities = ["Reconnaissance", "Élevée", "Élevée", "Critique", "Critique"]
+    for i, act in enumerate(CAMPAIGN["acts"]):
+        sev = severities[i] if i < len(severities) else "Info"
+        L.append(f"  [{i+1}] {act['title']}   (criticité : {sev})")
+        for mid in act["missions"]:
+            m = get_mission_by_id(mid)
+            if not m:
+                continue
+            state = "OK " if mid in player.completed_missions else "—  "
+            L.append(f"      [{state}] {m['title']} : {m['objective']}")
+            flag = _mission_flag(mid)
+            if flag and mid in player.completed_missions:
+                L.append(f"             preuve : {flag}")
+        L.append("")
+    done = sum(1 for mid in _all_mission_ids() if mid in player.completed_missions)
+    L.append("  RECOMMANDATIONS")
+    L.append("  ---------------")
+    L.append("  - Filtrer les entrées du formulaire de connexion (requêtes préparées).")
+    L.append("  - Retirer les binaires SUID inutiles et les secrets des variables d'env.")
+    L.append("  - Durcir SSH (clés uniquement), chiffrer les captures et les sauvegardes.")
+    L.append("")
+    L.append(f"  Progression : {done}/{len(_all_mission_ids())} objectifs atteints.")
+    L.append("=" * 68)
+    return "\n".join(L)
+
+
+def _show_report(player):
+    report = _build_report(player)
+    try:
+        with open(REPORT_PATH, "w") as f:
+            f.write(report + "\n")
+        saved = REPORT_PATH
+    except OSError:
+        saved = None
+    clear()
+    header("Rapport")
+    print()
+    for line in report.splitlines():
+        print(f"{DIM if line.startswith('=') else ''}  {line}{RESET}")
+    if saved:
+        print(f"\n  {GREEN}📄 Rapport enregistré : {saved}{RESET}")
+    press_enter()
+
+
 def _victory(player):
     clear()
     header("Campagne")
@@ -98,7 +183,8 @@ def _victory(player):
     for line in CAMPAIGN["outro"]:
         print(f"  {line}")
     print()
-    press_enter()
+    if prompt("📄 Générer le rapport de pentest ? [O/n]").lower() not in ("n", "non"):
+        _show_report(player)
 
 
 def play_campaign(player):

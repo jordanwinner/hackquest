@@ -431,6 +431,128 @@ write(_zc, "FLAG{zip_casse_au_dictionnaire}\n")
 subprocess.run(["zip", "-q", "-j", "--password", "letmein", f"{H}/crack/secret.zip", _zc], check=True)
 os.remove(_zc)
 
+# ══════════════════════════════════════════════════════════════════════════
+#  Crypto : petite boîte à outils + défis réels (tout local, déterministe)
+# ══════════════════════════════════════════════════════════════════════════
+os.makedirs(f"{H}/crypto", exist_ok=True)
+
+write("/usr/local/bin/encode", r'''#!/usr/bin/env python3
+import sys, base64, urllib.parse
+a = sys.argv[1:]
+if len(a) < 2:
+    print("usage: encode --base64|--hex|--url|--base64-d <texte>"); sys.exit()
+mode, data = a[0], " ".join(a[1:]).encode()
+if   mode == "--base64":   print(base64.b64encode(data).decode())
+elif mode == "--hex":      print(data.hex())
+elif mode == "--url":      print(urllib.parse.quote(data.decode()))
+elif mode == "--base64-d": print(base64.b64decode(data).decode(errors="replace"))
+else: print("modes: --base64 --hex --url --base64-d")
+''', 0o755)
+
+write("/usr/local/bin/xor", r'''#!/usr/bin/env python3
+import sys, os
+def rd(p): return open(p, "rb").read() if os.path.exists(p) else p.encode()
+a = sys.argv[1:]
+if a and a[0] == "-b" and len(a) > 1:
+    data = rd(a[1])
+    for k in range(256):
+        d = bytes(c ^ k for c in data)
+        if all(32 <= x < 127 or x in (9, 10, 13) for x in d):
+            print(f"cle 0x{k:02x}: {d.decode(errors='replace')}")
+elif len(a) >= 2:
+    data, key = rd(a[0]), int(a[1], 0)
+    sys.stdout.write(bytes(c ^ key for c in data).decode(errors="replace"))
+else:
+    print("usage: xor -b <fichier>   |   xor <fichier> <cle>")
+''', 0o755)
+
+write("/usr/local/bin/cipher", r'''#!/usr/bin/env python3
+import sys, os
+def rot(s, n): return "".join(
+    chr((ord(c)-65+n) % 26+65) if c.isupper() else
+    chr((ord(c)-97+n) % 26+97) if c.islower() else c for c in s)
+def atbash(s): return "".join(
+    chr(155-ord(c)) if c.isupper() else chr(219-ord(c)) if c.islower() else c for c in s)
+a = sys.argv[1:]
+if not a:
+    print("usage: cipher --rot13|--atbash|--caesar N|--caesar-brute <texte|fichier>"); sys.exit()
+txt = open(a[-1]).read().strip() if os.path.exists(a[-1]) else a[-1]
+if   a[0] == "--rot13":  print(rot(txt, 13))
+elif a[0] == "--atbash": print(atbash(txt))
+elif a[0] == "--caesar": print(rot(txt, int(a[1])))
+elif a[0] == "--caesar-brute":
+    for n in range(26): print(f"{n:2d}: {rot(txt, n)}")
+else: print("modes: --rot13 --atbash --caesar N --caesar-brute")
+''', 0o755)
+
+write("/usr/local/bin/magic", r'''#!/usr/bin/env python3
+import sys, os, base64
+a = sys.argv[1:]
+if not a:
+    print("usage: magic <fichier|texte>"); sys.exit()
+cur = (open(a[0]).read().strip() if os.path.exists(a[0]) else a[0]).strip()
+try:
+    h = bytes.fromhex(cur)
+    if all(32 <= c < 127 or c in (9, 10, 13) for c in h):
+        print(f"[hex] {h.decode()}"); cur = h.decode()
+except Exception: pass
+for depth in range(1, 5):
+    try:
+        d = base64.b64decode(cur + "=" * (-len(cur) % 4)).decode()
+        print(f"[base64 x{depth}] {d}"); cur = d
+        if "FLAG{" in d: break
+    except Exception: break
+''', 0o755)
+
+write("/usr/local/bin/ecb-detect", r'''#!/usr/bin/env python3
+import sys, os
+a = sys.argv[1:]
+if not a:
+    print("usage: ecb-detect <fichier hex>"); sys.exit()
+raw = open(a[0]).read().strip() if os.path.exists(a[0]) else a[0]
+try: data = bytes.fromhex(raw)
+except Exception: data = raw.encode()
+blocks = [data[i:i+16] for i in range(0, len(data), 16)]
+print(f"{len(blocks)} blocs de 16 octets, {len(set(blocks))} uniques")
+if len(set(blocks)) < len(blocks):
+    print("ATTENTION : blocs identiques detectes -> chiffrement en mode ECB")
+    print("FLAG{ecb_mode_detecte}")
+else:
+    print("Pas de bloc repete (ECB non evident)")
+''', 0o755)
+
+# artefacts crypto
+import base64 as _b64
+write(f"{H}/crypto/secret.xor", bytes(c ^ 0x42 for c in b"FLAG{xor_octet_unique_casse}"))     # crypt_01
+write(f"{H}/crypto/classique.txt",                                                              # crypt_09
+      "".join(chr((ord(c)-65+13) % 26+65) if c.isupper() else
+              chr((ord(c)-97+13) % 26+97) if c.islower() else c for c in "FLAG{cesar_rot13_decode}"))
+_inner = _b64.b64encode(b"FLAG{encodage_multiple}").decode()                                    # crypt_07
+write(f"{H}/crypto/mystere.txt", _b64.b64encode(_inner.encode()).decode())
+_blk = b"ChiffreECB_bloc!"                                                                      # crypt_06
+write(f"{H}/crypto/cipher.hex", (_blk*3 + b"AutreBloc_final!").hex())
+
+# ══════════════════════════════════════════════════════════════════════════
+#  PWN : un vrai binaire vulnérable (ret2win) + un générateur de pattern
+# ══════════════════════════════════════════════════════════════════════════
+os.makedirs(f"{H}/pwn", exist_ok=True)
+shutil.copy("/opt/vuln", f"{H}/pwn/vuln")
+os.chmod(f"{H}/pwn/vuln", 0o755)
+write(f"{H}/pwn/flag.txt", "FLAG{ret2win_buffer_overflow}\n")                                   # lu par win()
+
+write("/usr/local/bin/patterngen", r'''#!/usr/bin/env python3
+import sys, string
+n = int(sys.argv[1]) if len(sys.argv) > 1 else 200
+s = ""
+for u in string.ascii_uppercase:
+    for l in string.ascii_lowercase:
+        for d in string.digits:
+            s += u + l + d
+            if len(s) >= n:
+                print(s[:n]); sys.exit()
+print(s[:n])
+''', 0o755)
+
 sh("chown", "-R", "hacker:hacker", H)
 sh("chown", "hacker:hacker", "/usr/local/bin")                                     # fil_19 : ln -s dans /usr/local/bin
 # perms SSH strictes (sinon le client/daemon refusent les clés)

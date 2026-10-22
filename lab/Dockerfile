@@ -19,6 +19,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY bin/crackme /opt/crackme
+COPY bin/vuln /opt/vuln
 COPY world.py /tmp/world.py
 RUN python3 /tmp/world.py && rm /tmp/world.py \
  && updatedb && chmod 0644 /var/lib/plocate/plocate.db \
