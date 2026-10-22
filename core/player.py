@@ -126,6 +126,7 @@ class Player:
         self.hints_used = 0
         self.created_at = datetime.now().isoformat()
         self.restored_from_backup = False
+        self.sandbox = True  # missions 💻 dans le vrai shell (Docker)
 
     def get_level_info(self):
         current = LEVELS[0]
@@ -171,6 +172,7 @@ class Player:
             "unlocked_categories": self.unlocked_categories,
             "hints_used": self.hints_used,
             "created_at": self.created_at,
+            "sandbox": self.sandbox,
         }
         data["_migrated"] = True
         # garde la version précédente : une seule mauvaise écriture ne fait pas tout perdre
@@ -209,6 +211,7 @@ class Player:
             self.unlocked_categories = data.get("unlocked_categories", ["linux_navigation", "linux_files"])
             self.hints_used = data.get("hints_used", 0)
             self.created_at = data.get("created_at", datetime.now().isoformat())
+            self.sandbox = data.get("sandbox", True)
             # Applique les déblocages au chargement
             self.check_and_apply_unlocks()
         except (TypeError, AttributeError):

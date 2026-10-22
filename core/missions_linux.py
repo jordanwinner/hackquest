@@ -370,7 +370,7 @@ MISSIONS_LINUX["linux_text"] = {
             "story": "Tu veux savoir quelle IP apparaît le plus dans les logs.",
             "objective": "Compte et trie les occurrences de chaque ligne.",
             "expected_cmd": ["sort | uniq -c | sort -rn"], "accept_contains": ["uniq -c"],
-            "xp": 30, "hints": ["uniq -c préfixe chaque ligne par son nombre d'occurrences.", "sort access.log | uniq -c | sort -rn | head"],
+            "xp": 30, "hints": ["uniq -c préfixe chaque ligne par son nombre d'occurrences.", "awk '{print $1}' access.log | sort | uniq -c | sort -rn | head"],
             "unlocks": [],
         },
         {
@@ -426,7 +426,7 @@ MISSIONS_LINUX["linux_text"] = {
             "story": "Tu veux voir la sortie ET l'enregistrer dans un fichier en même temps.",
             "objective": "Redirige la sortie vers un fichier tout en l'affichant.",
             "expected_cmd": ["tee"], "accept_contains": ["tee"],
-            "xp": 20, "hints": ["tee affiche ET écrit dans un fichier.", "nmap 10.10.10.5 | tee scan.txt"],
+            "xp": 20, "hints": ["tee affiche ET écrit dans un fichier.", "ls -la | tee liste.txt"],
             "unlocks": [],
         },
         {

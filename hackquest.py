@@ -303,9 +303,12 @@ def show_settings(player):
     clear()
     banner()
     print(f"{BOLD}  ⚙️  PARAMÈTRES{RESET}\n")
-    print(f"  Nom actuel : {CYAN}{player.name}{RESET}\n")
+    print(f"  Nom actuel : {CYAN}{player.name}{RESET}")
+    state = f"{GREEN}activé{RESET}" if player.sandbox else f"{DIM}désactivé (mode texte){RESET}"
+    print(f"  Bac à sable 💻 : {state}\n")
     print(f"  {CYAN}[1]{RESET} Changer de nom")
     print(f"  {RED}[2]{RESET} Réinitialiser la progression")
+    print(f"  {CYAN}[3]{RESET} {'Désactiver' if player.sandbox else 'Activer'} le bac à sable")
     print(f"  {DIM}[0]{RESET} Retour\n")
 
     choice = prompt("Choix")
@@ -329,6 +332,13 @@ def show_settings(player):
             player.save()
             success("Progression réinitialisée. Tu repars de zéro !")
             press_enter()
+
+    elif choice == "3":
+        player.sandbox = not player.sandbox
+        player.save()
+        success("Bac à sable " + ("activé : les missions 💻 se jouent dans un vrai shell." if player.sandbox
+                                  else "désactivé : toutes les missions se jouent en mode texte."))
+        press_enter()
 
 
 def first_launch(player):

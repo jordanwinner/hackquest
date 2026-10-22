@@ -1,0 +1,143 @@
+"""
+Construit le monde du labo (exécuté une seule fois, en root, pendant `docker build`).
+
+Le décor : srv-target, un serveur web compromis. Le joueur est l'utilisateur
+`hacker` et fouille le système. Chaque fichier sert à au moins une mission
+(voir core/labs.py) : si tu modifies une valeur ici, vérifie la mission associée.
+"""
+import os
+import random
+import shutil
+import subprocess
+
+random.seed(1337)  # même monde à chaque construction
+H = "/home/hacker"
+
+
+def sh(*cmd):
+    subprocess.run(cmd, check=True)
+
+
+def write(path, content, mode=0o644):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb" if isinstance(content, bytes) else "w") as f:
+        f.write(content)
+    os.chmod(path, mode)
+
+
+def lines(items):
+    return "\n".join(items) + "\n"
+
+
+# ── Utilisateurs ─────────────────────────────────────────────────────────
+sh("useradd", "-m", "-s", "/bin/bash", "-u", "1000", "hacker")
+sh("useradd", "-M", "-s", "/bin/bash", "admin")          # txt_06 : ^(root|admin)
+os.remove("/usr/local/bin/python")                       # fil_19 : ln -s ... python
+write("/etc/hostname", "srv-target\n")
+
+# ── Home : navigation ────────────────────────────────────────────────────
+write(f"{H}/notes.txt", lines([
+    "Notes d'intrusion — srv-target",
+    "- accès initial via un mot de passe faible",
+    "- regarder /var/log, /etc et /opt",
+    "- des fichiers cachés traînent dans le home",
+]))
+write(f"{H}/.secret", "FLAG{fichiers_caches_reveles}\n")                         # nav_03
+write(f"{H}/dump_memoire.bin", random.randbytes(2_500_000))                      # nav_04 : 2.4M
+write(f"{H}/projet/README.md", "# Projet interne\n")
+write(f"{H}/projet/src/main.py", "print('hello')\n")
+write(f"{H}/projet/src/utils/crypto.py", "KEY = 'changeme'\n")
+write(f"{H}/projet/docs/plan.txt", "Migration prévue en décembre.\n")
+
+# ── Home : fichiers ──────────────────────────────────────────────────────
+write(f"{H}/note.txt", lines([
+    "Si tu lis ceci, tu sais utiliser cat.",
+    "FLAG{premier_fichier_lu}",
+]))                                                                               # fil_01
+write(f"{H}/rapport.txt", lines(f"Point {i} du rapport d'audit" for i in range(1, 16)))  # fil_02
+write(f"{H}/dump.txt", lines(f"ligne {i} — entrée de journal" for i in range(1, 10_001)))  # fil_03
+app_log = [f"2026-10-21 08:{i // 60:02d}:{i % 60:02d} INFO requête traitée #{i}" for i in range(300)]
+app_log.append("2026-10-21 13:00:00 CRIT dernière entrée : FLAG{fin_du_log_atteinte}")
+write(f"{H}/logs/app.log", lines(app_log))                                        # fil_04, fil_05
+write(f"{H}/suspicious.txt", "admin:Winter2026!\n")                               # fil_12
+write(f"{H}/traces.log", "connexion depuis 185.220.101.42\n")                     # fil_13
+shutil.copy("/usr/bin/whoami", f"{H}/suspicious.bin")                             # fil_15 : ELF
+write(f"{H}/config_v1.conf", lines(["Port 22", "PermitRootLogin no", "PasswordAuthentication no", "MaxAuthTries 3"]))
+write(f"{H}/config_v2.conf", lines(["Port 22", "PermitRootLogin yes", "PasswordAuthentication no", "MaxAuthTries 10"]))  # fil_18
+write(f"{H}/ordre.txt", lines([f"{i}. étape {i}" for i in range(1, 10)] + ["10. FIN — lu à l'envers, je suis en premier"]))  # fil_20
+
+# ── Home : texte ─────────────────────────────────────────────────────────
+write(f"{H}/data/users.txt", lines([
+    "alice user", "bob user", "Admin principal", "carol user",
+    "ADMIN sauvegarde", "dave user", "aDmIn caché", "eve user",
+]))                                                                               # txt_03
+domaines = ["zeta.corp", "alpha.corp", "mail.corp", "vpn.corp", "dev.corp", "beta.corp", "intranet.corp"]
+write(f"{H}/data/domaines.txt", lines(domaines))                                  # txt_09
+write(f"{H}/data/ports.txt", lines(["8080", "22", "443", "3306", "80", "21", "8443", "25"]))  # txt_10
+ips = ["10.0.0.5", "10.0.0.9", "192.168.1.20", "10.0.0.5", "172.16.0.3", "10.0.0.9", "10.0.0.5"]
+write(f"{H}/data/ips.txt", lines(ips))                                            # txt_11
+
+# access.log au format Apache : $1 = IP, $9 = code HTTP
+#   185.220.101.42 : l'IP la plus fréquente (txt_12)
+#   10.0.0.77      : uniquement des 200 (txt_14)
+#   203.0.113.9    : uniquement des 404 (txt_14)
+paths = ["/", "/index.php", "/login", "/admin", "/api/users", "/api/error", "/static/app.js"]
+access = []
+for i in range(400):
+    roll = random.random()
+    if roll < 0.35:
+        ip, code = "185.220.101.42", random.choice([200, 401, 403])
+    elif roll < 0.45:
+        ip, code = "10.0.0.77", 200
+    elif roll < 0.52:
+        ip, code = "203.0.113.9", 404
+    else:
+        ip, code = f"192.168.1.{random.randint(2, 60)}", random.choice([200, 200, 302, 500])
+    path = random.choice(paths)
+    access.append(f'{ip} - - [21/Oct/2026:10:{i // 60:02d}:{i % 60:02d} +0100] "GET {path} HTTP/1.1" {code} {random.randint(200, 9000)}')
+write(f"{H}/logs/access.log", lines(access))                                      # txt_05, 12, 13, 14
+
+write(f"{H}/config/site.conf", lines([
+    "url=http://srv-target.corp",
+    "api=http://api.srv-target.corp/v1",
+    "cdn=http://cdn.srv-target.corp",
+]))                                                                               # txt_15
+write(f"{H}/config/app.conf", lines([
+    "# Configuration de l'application", "", "port=8080", "# debug activé en prod (!)",
+    "debug=true", "", "", "# base de données", "db_host=127.0.0.1",
+]))                                                                               # txt_16
+for n in range(1, 6):
+    write(f"{H}/tmpfiles/temp{n}.tmp", "x\n")
+write(f"{H}/a_supprimer.txt", lines(f"tmpfiles/temp{n}.tmp" for n in range(1, 6)))  # txt_18
+with open("/usr/bin/true", "rb") as f:
+    binaire = f.read()
+write(f"{H}/binaire", binaire + b"\x00\x00admin_password=FLAG{strings_revele_tout}\x00\x00", 0o755)  # txt_20
+write(f"{H}/fichier.bin", b"\x7fHQ\x01" + bytes(range(32)) + b"FLAG{hexdump}\n")  # txt_21
+
+# ── Système ──────────────────────────────────────────────────────────────
+write("/opt/backup/.old/credentials.txt", "root:FLAG{find_fouille_partout}\n")      # nav_09
+shutil.copy("/usr/bin/id", "/usr/local/bin/backup-tool")
+os.chmod("/usr/local/bin/backup-tool", 0o4755)                                     # nav_11 : SUID
+write("/etc/nginx/nginx.conf", "user www-data;\nworker_processes auto;\n")
+write("/etc/nginx/sites-enabled/default", "server { listen 80; root /var/www/html; }\n")  # fil_11
+write("/etc/app/db.conf", "host=127.0.0.1\nuser=app\npassword=FLAG{grep_recursif_payant}\n")  # txt_02
+write("/etc/ssh/sshd_config", lines([
+    "# Configuration SSH de srv-target", "#Port 22", "Port 2222",
+    "# Ne jamais laisser root se connecter !", "PermitRootLogin yes",
+    "#PasswordAuthentication no", "PasswordAuthentication yes",
+]))                                                                               # txt_04
+
+syslog = [f"Oct 21 0{i % 10}:{i % 60:02d}:{(i * 7) % 60:02d} srv-target cron[{1000 + i}]: job #{i} terminé" for i in range(3000)]
+syslog[1874] = "Oct 21 03:14:15 srv-target kernel: BREACH detected — exfiltration vers 185.220.101.42 FLAG{breach_localise}"
+write("/var/log/syslog", lines(syslog))                                          # txt_01, fil_06
+auth = []
+for i in range(120):
+    if i % 3 == 0 and len([a for a in auth if "failed" in a]) < 37:
+        auth.append(f"Oct 21 04:{i % 60:02d}:00 srv-target sshd[{2000 + i}]: authentication failed for root from 185.220.101.42")
+    else:
+        auth.append(f"Oct 21 04:{i % 60:02d}:00 srv-target sshd[{2000 + i}]: session opened for user hacker")
+write("/var/log/auth.log", lines(auth))                                          # txt_07 : 37 « failed »
+assert sum("failed" in a for a in auth) == 37
+
+sh("chown", "-R", "hacker:hacker", H)
+sh("chown", "hacker:hacker", "/usr/local/bin")                                     # fil_19 : ln -s dans /usr/local/bin

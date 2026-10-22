@@ -96,6 +96,15 @@ else
     exit 1
 fi
 
+# ── Docker (optionnel) : nécessaire pour les missions 💻 dans le vrai shell
+if command -v docker &>/dev/null && docker info &>/dev/null; then
+    echo -e "  ${GREEN}✅ Docker détecté : les missions 💻 se joueront dans un vrai shell${NC}"
+else
+    echo -e "\n  ${BOLD}💻 Optionnel :${NC} installe Docker pour jouer les missions dans un vrai shell :"
+    echo -e "     sudo apt install docker.io && sudo usermod -aG docker \$USER"
+    echo -e "     (puis déconnecte-toi / reconnecte-toi). Sans Docker, le jeu marche en mode texte."
+fi
+
 echo -e "\n  Pour lancer le jeu :"
 if [ -n "$SHELL_RC" ]; then
     echo -e "  ${CYAN}${BOLD}  source $SHELL_RC && hackquest${NC}\n"
