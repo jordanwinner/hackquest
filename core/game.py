@@ -1,5 +1,5 @@
 from core.registry import ALL_MISSIONS as MISSIONS
-from core.ui import *
+from core.ui import *  # header, banner, clear, couleurs, prompt...
 from core.validate import is_valid_answer, same_tool
 from core.labs import LABS, WHERE
 from core import sandbox
@@ -8,7 +8,7 @@ def show_categories(player):
     """Affiche les catégories disponibles et verrouillées."""
     while True:
         clear()
-        banner()
+        header()
         print(f"{BOLD}  📋 CHOISIR UNE CATÉGORIE{RESET}\n")
 
         categories = list(MISSIONS.items())
@@ -55,7 +55,7 @@ def show_missions(player, cat_id, cat_data):
     """Affiche les missions d'une catégorie."""
     while True:
         clear()
-        banner()
+        header()
         print(f"{BOLD}  {cat_data['title']}{RESET}\n")
 
         missions = cat_data["missions"]
@@ -110,7 +110,7 @@ def _lab_ready(player):
     if sandbox.image_ready():
         return True
     clear()
-    banner()
+    header()
     print(f"{BOLD}  💻 Le labo n'est pas encore construit{RESET}\n")
     print("  Les missions 💻 se jouent dans un vrai shell, sur un faux serveur isolé")
     print("  (conteneur Docker sans réseau, détruit après chaque mission).")
@@ -134,7 +134,7 @@ def _lab_ready(player):
 
 def _header(mission, already_done, animate):
     clear()
-    banner()
+    header()
     print(f"{BOLD}  📌 {mission['title']}{RESET}  {DIM}(+{mission['xp']} XP){RESET}")
     separator()
     print(f"\n{CYAN}  📖 Histoire :{RESET}")

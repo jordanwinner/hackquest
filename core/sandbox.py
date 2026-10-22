@@ -127,9 +127,13 @@ class Lab:
         return _docker("exec", "-u", "root", self.name, "bash", "-c", script)
 
     def _open_shell(self):
+        env_flags = []
+        for key, val in self.spec.get("env", {}).items():
+            env_flags += ["-e", f"{key}={val}"]
         self.shell = subprocess.Popen(
             ["docker", "exec", "-i", "-u", "hacker", "-w", self.cwd,
              "-e", f"HOME={HOME}", "-e", "USER=hacker", "-e", "TERM=xterm-256color",
+             *env_flags,
              self.name, "bash", "--noprofile", "--norc"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,
             # nouvelle session : le Ctrl+C du joueur ne doit pas tuer `docker exec`, c'est nous qui gérons

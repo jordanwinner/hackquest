@@ -26,6 +26,8 @@ hackquest
 
 Les missions marquées **💻 labo** se jouent dans un **vrai shell**, sur `srv-target`, un faux serveur compromis rempli de logs, de fichiers cachés et de flags. Une mission n'est validée que si **le résultat est là** : flag affiché, fichier créé, bon dossier atteint…
 
+Toutes les missions **Linux locales** ont un labo (navigation, fichiers, texte, permissions, processus, archives, système, scripting, avancé). Les catégories qui ont besoin d'une cible réseau ou d'une cible distante (Nmap, Web, OSINT, Active Directory…) restent en mode texte, puisque le labo n'a **pas de réseau** par choix de sécurité.
+
 - Il faut **Docker**. Sans Docker, ces missions se jouent en mode texte. Pour l'installer (Ubuntu/Debian/Kali) :
 
   ```bash

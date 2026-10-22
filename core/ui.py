@@ -15,7 +15,10 @@ DIM     = "\033[2m"
 RESET   = "\033[0m"
 
 def clear():
-    os.system("clear")
+    # Redessine en place (curseur en haut + efface jusqu'en bas) au lieu de vider
+    # tout l'écran : pas de scintillement ni de défilement entre deux choix.
+    sys.stdout.write("\033[H\033[J")
+    sys.stdout.flush()
 
 def slow_print(text, delay=0.018):
     """Affiche le texte lettre par lettre pour l'effet narratif."""
@@ -36,6 +39,14 @@ def banner():
   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚══▀▀╝  ╚═════╝ ╚══════╝╚══════╝   ╚═╝   
 {RESET}{DIM}  Learn Linux & Cybersecurity by doing — Level up. Hack the world.{RESET}
 """)
+
+def header(subtitle=""):
+    """En-tête compact pour les écrans de navigation : une ligne au lieu du grand logo,
+    pour que passer d'un menu à l'autre ne redessine pas tout l'écran."""
+    clear()
+    sub = f"  {DIM}·{RESET}  {subtitle}" if subtitle else ""
+    print(f"\n  {CYAN}{BOLD}⚡ HACKQUEST{RESET}{sub}")
+    separator()
 
 def separator(char="─", width=65, color=DIM):
     print(f"{color}{char * width}{RESET}")

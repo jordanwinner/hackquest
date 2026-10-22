@@ -110,6 +110,77 @@ LABS = {
                "solution": "ls | tee liste.txt"},
     "txt_20": {"checks": [{"out": "FLAG{strings_revele_tout}"}], "solution": "strings binaire | grep -i pass"},
     "txt_21": {"checks": [{"re": r"^00000000: "}], "solution": "xxd fichier.bin | head -20"},
+
+    # ── Permissions ──────────────────────────────────────────────────────
+    "perm_01": {"checks": [{"test": "[ -x ~/exploit.sh ]"}], "solution": "chmod +x exploit.sh"},
+    "perm_02": {"checks": [{"test": '[ "$(stat -c %a ~/id_rsa)" = 600 ]'}], "solution": "chmod 600 id_rsa"},
+    "perm_03": {"checks": [{"test": '[ "$(stat -c %a ~/world_me.txt)" = 777 ]'}],
+                "solution": "chmod 777 world_me.txt"},
+    "perm_06": {"checks": [{"re": r"^hacker$"}], "solution": "whoami"},
+    "perm_07": {"checks": [{"out": "uid=1000", "re": r"gid=\d+"}], "solution": "id"},
+    "perm_13": {"checks": [{"re": r"^0?\d{3}$"}], "solution": "umask"},
+
+    # ── Processus ────────────────────────────────────────────────────────
+    "proc_01": {"checks": [{"out": ["PID", "COMMAND"]}], "solution": "ps aux"},
+    "proc_02": {"background": "exec -a nginx sleep 100000",
+                "checks": [{"out": "nginx"}], "solution": "ps aux | grep nginx"},
+    # nohup.out n'apparaît qu'avec un vrai terminal ; ici on vérifie que le processus tourne en fond
+    "proc_08": {"checks": [{"test": "sleep 0.4; [ -f ~/nohup.out ] || pgrep -u hacker -x sleep >/dev/null"}],
+                "solution": "nohup sleep 300 &"},
+    "proc_13": {"checks": [{"out": "Linux"}], "solution": "uname -a"},
+    "proc_14": {"checks": [{"out": "load average"}], "solution": "uptime"},
+    "proc_15": {"checks": [{"out": "sleep"}], "solution": "pstree"},
+
+    # ── Archives ─────────────────────────────────────────────────────────
+    "arc_01": {"checks": [{"test": "find ~ /tmp -maxdepth 2 -name '*.tar.gz' -cnewer /run/hq/start "
+                                   "! -name exploit.tar.gz | grep -q ."}],
+               "solution": "tar -czf nginx.tar.gz /etc/nginx"},
+    "arc_02": {"checks": [{"test": "find ~ /tmp -name secret.txt -cnewer /run/hq/start | grep -q ."}],
+               "solution": "tar -xzf exploit.tar.gz"},
+    "arc_03": {"checks": [{"out": "secret.txt", "not_out": "FLAG"}], "solution": "tar -tzf exploit.tar.gz"},
+    "arc_04": {"checks": [{"test": "[ -f ~/gros.log.gz ] && [ ! -f ~/gros.log ]"}], "solution": "gzip gros.log"},
+    "arc_05": {"checks": [{"test": "[ -f ~/access.log.saved ] && [ ! -f ~/access.log.saved.gz ]"}],
+               "solution": "gunzip access.log.saved.gz"},
+    "arc_06": {"checks": [{"test": "find ~ /tmp -maxdepth 2 -name '*.zip' -cnewer /run/hq/start | grep -q ."}],
+               "solution": "zip loot.zip notes.txt note.txt"},
+    "arc_07": {"checks": [{"test": "find ~ /tmp -maxdepth 2 -name '*.7z' -cnewer /run/hq/start | grep -q ."}],
+               "solution": "7z a loot.7z notes.txt"},
+
+    # ── Système ──────────────────────────────────────────────────────────
+    "sys_01": {"checks": [{"re": r"%|Avail|Mont"}], "solution": "df -h"},
+    "sys_02": {"checks": [{"re": r"\d"}], "solution": "du -sh /var/data"},
+    "sys_03": {"checks": [{"out": "Mem"}], "solution": "free -h"},
+    "sys_04": {"env": {"DB_PASSWORD": "FLAG{credentials_dans_env}"},
+               "checks": [{"out": "FLAG{credentials_dans_env}"}], "solution": "env | grep -i pass"},
+    "sys_08": {"checks": [{"out": "/opt/backup/run.sh"}], "solution": "crontab -l"},
+    "sys_13": {"checks": [{"out": "root:x:0:0"}], "solution": "cat /etc/passwd"},
+    "sys_14": {"checks": [{"out": "FLAG_hash_a_cracker"}], "solution": "cat /etc/shadow.bak"},
+
+    # ── Scripting ────────────────────────────────────────────────────────
+    "scr_01": {"checks": [{"re": r"\S"}], "solution": "TARGET=10.10.10.5 && echo $TARGET"},
+    "scr_02": {"checks": [{"test": "find ~ /tmp -maxdepth 2 -type f -cnewer /run/hq/start "
+                                   "! -name nohup.out | grep -q ."}],
+               "solution": "echo resultat > scan.txt"},
+    "scr_03": {"checks": [{"not_out": "Permission denied", "re": r"\S"}],
+               "solution": "find / -name secret 2>/dev/null"},
+    "scr_04": {"checks": [{"re": r"\S"}], "solution": 'if [ -f /etc/passwd ]; then echo "existe"; fi'},
+    "scr_05": {"checks": [{"lines": 3}], "solution": "for ip in 1 2 3; do echo 10.0.0.$ip; done"},
+    "scr_06": {"checks": [{"re": r"\S"}], "solution": "i=0; while [ $i -lt 3 ]; do echo $i; i=$((i+1)); done"},
+    "scr_07": {"checks": [{"re": r"\S"}], "solution": 'function salut() { echo "bonjour $1"; }; salut monde'},
+    "scr_08": {"checks": [{"re": r"\S"}], "solution": 'set -- 10.0.0.5 80; echo "cible $1 port $2"'},
+    "scr_09": {"checks": [{"re": r"^\d+$"}], "solution": "false; echo $?"},
+    "scr_10": {"checks": [{"out": "ligne1"}], "solution": "cat <<EOF\nligne1\nligne2\nEOF"},
+    "scr_11": {"checks": [{"re": r"\S"}],
+               "solution": "awk '{print $1}' logs/access.log | sort | uniq -c | sort -rn | head -5"},
+    "scr_13": {"checks": [{"out": "analyse de"}], "solution": "chmod +x scan.sh && ./scan.sh 10.0.0.5"},
+
+    # ── Avancé ───────────────────────────────────────────────────────────
+    "adv_03": {"checks": [{"re": r"[A-Za-z0-9+/]{8,}={0,2}"}], "solution": "echo 'payload' | base64"},
+    "adv_04": {"checks": [{"re": r"^[0-9a-f]{32,}"}], "solution": "md5sum a_hasher.bin"},
+    "adv_05": {"checks": [{"re": r"\S"}], "solution": "openssl rand -hex 16"},
+    "adv_08": {"checks": [{"re": r"^\d"}], "solution": "echo '1500000 / 1024 / 1024' | bc"},
+    "adv_11": {"checks": [{"test": "find /tmp -path '*creds.txt' -cnewer /run/hq/start | grep -q ."}],
+               "solution": "rsync -av exfil/ /tmp/exfil_copie/"},
 }
 
 # Indice contextuel affiché au début de chaque labo (où chercher)
@@ -122,4 +193,9 @@ WHERE = {
     "txt_13": "logs/access.log", "txt_14": "logs/access.log", "txt_15": "config/site.conf",
     "txt_16": "config/app.conf", "txt_18": "a_supprimer.txt", "txt_20": "binaire", "txt_21": "fichier.bin",
     "nav_08": "projet/",
+    "perm_01": "exploit.sh", "perm_02": "id_rsa", "perm_03": "world_me.txt",
+    "arc_02": "exploit.tar.gz", "arc_03": "exploit.tar.gz", "arc_04": "gros.log",
+    "arc_05": "access.log.saved.gz", "sys_02": "/var/data", "sys_08": "crontab de hacker",
+    "sys_14": "/etc/shadow.bak", "scr_05": "cibles.txt", "scr_13": "scan.sh",
+    "adv_04": "a_hasher.bin", "adv_11": "exfil/",
 }

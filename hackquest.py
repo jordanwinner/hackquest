@@ -81,7 +81,7 @@ def main_menu(player):
 def show_stats(player):
     """Affiche les stats détaillées du joueur."""
     clear()
-    banner()
+    header()
     current, next_lvl = player.get_level_info()
     _, title, icon = current
 
@@ -123,7 +123,7 @@ def show_stats(player):
 def show_cheatsheet():
     """Cheatsheet rapide des commandes Linux et outils cybersécurité."""
     clear()
-    banner()
+    header()
     print(f"{BOLD}  📖 CHEATSHEET RAPIDE{RESET}\n")
 
     sections = {
@@ -248,7 +248,7 @@ def show_cheatsheet():
 def show_progress_map(player):
     """Affiche la carte de progression complète."""
     clear()
-    banner()
+    header()
     print(f"{BOLD}  🗺️  CARTE DE PROGRESSION{RESET}\n")
 
     from core.registry import ALL_MISSIONS, PROGRESSION_ORDER
@@ -301,7 +301,7 @@ def show_progress_map(player):
 def show_settings(player):
     """Paramètres."""
     clear()
-    banner()
+    header()
     print(f"{BOLD}  ⚙️  PARAMÈTRES{RESET}\n")
     print(f"  Nom actuel : {CYAN}{player.name}{RESET}")
     state = f"{GREEN}activé{RESET}" if player.sandbox else f"{DIM}désactivé (mode texte){RESET}"

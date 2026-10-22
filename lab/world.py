@@ -139,5 +139,43 @@ for i in range(120):
 write("/var/log/auth.log", lines(auth))                                          # txt_07 : 37 « failed »
 assert sum("failed" in a for a in auth) == 37
 
+# ── Permissions ──────────────────────────────────────────────────────────
+write(f"{H}/exploit.sh", "#!/bin/bash\necho 'exploit lancé'\n", 0o644)             # perm_01 : chmod +x
+write(f"{H}/id_rsa", "-----BEGIN OPENSSH PRIVATE KEY-----\nFLAG{cle_privee}\n"
+                     "-----END OPENSSH PRIVATE KEY-----\n", 0o644)                  # perm_02 : chmod 600
+write(f"{H}/world_me.txt", "fichier aux permissions trop ouvertes\n", 0o644)       # perm_03 : chmod 777
+
+# copie lisible de /etc/shadow pour la mission (dans la vraie vie, il ne l'est jamais)
+write("/etc/shadow.bak", "root:$6$abc$FLAG_hash_a_cracker:19000:0:99999:7:::\n"
+                         "hacker:$6$xyz$autre_hash:19000:0:99999:7:::\n", 0o644)    # sys_14
+write("/opt/secret", "donnée sensible oubliée par l'admin\n")                      # scr_03 : cible de find
+
+# ── Archives ─────────────────────────────────────────────────────────────
+os.makedirs(f"{H}/arch", exist_ok=True)
+write(f"{H}/arch/secret.txt", "FLAG{archive_extraite}\n")
+write(f"{H}/arch/data.csv", "id,valeur\n1,42\n2,1337\n")
+subprocess.run(["tar", "-czf", f"{H}/exploit.tar.gz", "-C", f"{H}/arch", "."], check=True)  # arc_02, arc_03
+write(f"{H}/gros.log", lines(f"entrée de log numéro {i}" for i in range(500)))     # arc_04 : gzip
+write(f"{H}/access.log.saved", lines(f"hit {i}" for i in range(300)))
+subprocess.run(["gzip", f"{H}/access.log.saved"], check=True)                      # arc_05 : gunzip -> access.log.saved.gz
+
+# ── Système ──────────────────────────────────────────────────────────────
+os.makedirs("/var/data", exist_ok=True)
+write("/var/data/gros_fichier.bin", random.randbytes(1_500_000))                   # sys_02 : du
+# crontab de hacker (une tâche suspecte) pour sys_08 — hacker doit pouvoir la lire
+sh("usermod", "-aG", "crontab", "hacker")
+write("/tmp/hacker.cron", "# tâche planifiée du serveur\n*/5 * * * * /opt/backup/run.sh\n")
+sh("su", "hacker", "-c", "crontab /tmp/hacker.cron")
+os.remove("/tmp/hacker.cron")
+
+# ── Scripting ────────────────────────────────────────────────────────────
+write(f"{H}/scan.sh", "#!/bin/bash\necho \"analyse de $1 en cours...\"\n", 0o644)  # scr_13 : chmod +x && lancer
+write(f"{H}/cibles.txt", lines(["10.0.0.1", "10.0.0.2", "10.0.0.3"]))              # scr_05 : for
+
+# ── Avancé ───────────────────────────────────────────────────────────────
+write(f"{H}/a_hasher.bin", b"contenu binaire a verifier\n")                        # adv_04 : md5sum/sha256sum
+os.makedirs(f"{H}/exfil", exist_ok=True)
+write(f"{H}/exfil/creds.txt", "admin:FLAG{loot_synchronise}\n")                     # adv_11 : rsync (dossier exfil, pas loot qui sert à fil_08)
+
 sh("chown", "-R", "hacker:hacker", H)
 sh("chown", "hacker:hacker", "/usr/local/bin")                                     # fil_19 : ln -s dans /usr/local/bin
