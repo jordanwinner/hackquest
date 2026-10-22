@@ -1,6 +1,6 @@
 import atexit
 
-from core.registry import ALL_MISSIONS as MISSIONS, PROGRESSION_ORDER
+from core.registry import ALL_MISSIONS as MISSIONS, PROGRESSION_ORDER, unlock_hint as unlock_category_hint
 from core.ui import *  # header, banner, clear, couleurs, prompt...
 from core.validate import is_valid_answer, same_tool
 from core.labs import LABS, WHERE
@@ -19,25 +19,24 @@ def show_categories(player):
         categories = list(MISSIONS.items())
         available = []
 
-        for i, (cat_id, cat_data) in enumerate(categories):
+        # une ligne par catégorie : la liste des 25 tient à l'écran
+        for cat_id, cat_data in categories:
             unlocked = cat_id in player.unlocked_categories
-            completed = sum(
-                1 for m in cat_data["missions"]
-                if m["id"] in player.completed_missions
-            )
+            completed = sum(1 for m in cat_data["missions"] if m["id"] in player.completed_missions)
             total = len(cat_data["missions"])
-
+            title = cat_data["title"]
             if unlocked:
-                status = f"{GREEN}✅ {completed}/{total}{RESET}"
-                idx = len(available)
                 available.append((cat_id, cat_data))
-                print(f"  {CYAN}{BOLD}[{idx + 1}]{RESET} {cat_data['title']}")
-                print(f"      {DIM}{cat_data['description']}{RESET}")
-                print(f"      Progression : {status}")
+                num = f"{CYAN}{BOLD}[{len(available)}]{RESET}"
+                done = f"{GREEN}✅ {completed}/{total}{RESET}" if completed == total and total \
+                    else f"{GREEN}{completed}{RESET}{DIM}/{total}{RESET}"
+                print(f"  {num:>4} {title}  {done}")
             else:
-                print(f"  {DIM}[🔒] {cat_data['title']} — {cat_data['description']}{RESET}")
-            print()
+                hint = unlock_category_hint(cat_id)
+                tip = f"{DIM} — 🔒 {hint}{RESET}" if hint else ""
+                print(f"  {DIM}[🔒] {title}{RESET}{tip}")
 
+        print()
         separator()
         print(f"  {DIM}[0] Retour au menu principal{RESET}\n")
 
@@ -66,19 +65,17 @@ def show_missions(player, cat_id, cat_data):
         missions = cat_data["missions"]
         available = []
 
+        # une ligne par mission : coche, titre, XP, badge labo
         for i, m in enumerate(missions):
             done = m["id"] in player.completed_missions
-            if done:
-                status = f"{GREEN}✅ Complétée{RESET}"
-            else:
-                status = f"{YELLOW}⏳ En attente{RESET}"
+            mark = f"{GREEN}✅{RESET}" if done else f"{YELLOW}·{RESET}"
             available.append(m)
             num = f"{CYAN}{BOLD}[{i+1}]{RESET}"
-            lab = f"  {GREEN}💻 labo{RESET}" if m["id"] in LABS else ""
-            print(f"  {num} {BOLD}{m['title']}{RESET}  {DIM}(+{m['xp']} XP){RESET}{lab}")
-            print(f"      {status}")
-            print(f"      {DIM}{m['objective']}{RESET}\n")
+            lab = f" {GREEN}💻{RESET}" if m["id"] in LABS else "   "
+            title = f"{DIM}{m['title']}{RESET}" if done else f"{BOLD}{m['title']}{RESET}"
+            print(f"  {mark} {num:>4}{lab} {title}  {DIM}(+{m['xp']} XP){RESET}")
 
+        print(f"\n  {DIM}Astuce : tape le numéro d'une mission. Objectif détaillé une fois dedans.{RESET}\n")
         separator()
         print(f"  {DIM}[0] Retour{RESET}\n")
 
@@ -351,9 +348,43 @@ def _interactive_tip(cmd):
     return _INTERACTIVE[parts[0]]
 
 
-def _lab_help():
+import re as _re
+_FLAG_RE = _re.compile(r"FLAG\{[^}]+\}")
+
+
+def _mission_flag(spec):
+    """Déduit le flag attendu d'une mission : champ `flag` explicite, sinon un
+    FLAG{...} présent dans les `checks` (valeurs `out`). None sinon (ls, cd...)."""
+    if spec.get("flag"):
+        return spec["flag"]
+    for alt in spec.get("checks", []):
+        out = alt.get("out", [])
+        for s in (out if isinstance(out, list) else [out]):
+            m = _FLAG_RE.fullmatch(s) or _FLAG_RE.search(s)
+            if m:
+                return m.group(0)
+    return None
+
+
+def _flag_submission(cmd, flag):
+    """Interprète une tentative de soumission de flag. Renvoie 'ok', 'ko' ou None
+    (= ce n'est pas une soumission, à traiter comme une commande shell)."""
+    parts = cmd.split(maxsplit=1)
+    head = parts[0].lower()
+    if head in ("flag", "submit", "soumets", "soumettre") and len(parts) == 2:
+        candidate = parts[1].strip().strip("'\"")
+    elif cmd.strip().startswith("FLAG{"):
+        candidate = cmd.strip()
+    else:
+        return None
+    return "ok" if candidate == flag else "ko"
+
+
+def _lab_help(has_flag=False):
+    extra = (f"\n  {DIM}🚩 Quand tu trouves le flag, {YELLOW}soumets-le{RESET}{DIM} : tape-le "
+             f"directement (ou « submit FLAG{{...}} »).{RESET}") if has_flag else ""
     print(f"  {DIM}Commandes du jeu : {YELLOW}hint{RESET}{DIM} (-5 XP) · objectif · reset (labo neuf) · "
-          f"clear · skip · back (ou Ctrl+D){RESET}\n")
+          f"clear · skip · back (ou Ctrl+D){RESET}{extra}\n")
 
 
 def run_lab_mission(player, mission, spec):
@@ -361,6 +392,11 @@ def run_lab_mission(player, mission, spec):
     et la mission est validée sur le résultat (flag trouvé, fichier créé, bon dossier...)."""
     already_done = mission["id"] in player.completed_missions
     hint_index = 0
+    flag = _mission_flag(spec)
+    # Les vraies missions CTF (hors Linux de base) exigent de soumettre le flag :
+    # lancer la bonne commande ne suffit pas, il faut avoir lu le résultat.
+    category = _category_of(mission["id"]) or ""
+    require_flag = bool(flag) and not category.startswith("linux_")
 
     _header(mission, already_done, animate=True)
     print(f"  {DIM}⚙  Démarrage du labo...{RESET}", end="", flush=True)
@@ -372,7 +408,7 @@ def run_lab_mission(player, mission, spec):
               f"détruit à la fin. Casse tout si tu veux.{RESET}")
         if mission["id"] in WHERE:
             print(f"  📂 Fichier de la mission : {CYAN}{WHERE[mission['id']]}{RESET}")
-        _lab_help()
+        _lab_help(has_flag=bool(flag))
 
         while True:
             line = _shell_input(lab)
@@ -400,11 +436,22 @@ def run_lab_mission(player, mission, spec):
                 print()
                 continue
             if word in ("aide", "help"):
-                _lab_help()
+                _lab_help(has_flag=bool(flag))
                 continue
             if word == "clear":
                 clear()
                 continue
+
+            # ── Soumission du flag (vraie sensation CTF : il faut l'avoir lu) ──
+            if flag:
+                verdict = _flag_submission(cmd, flag)
+                if verdict == "ok":
+                    print(f"{GREEN}  🚩 Flag correct !{RESET}")
+                    _complete(player, mission, already_done)
+                    return _after_mission(player, mission)
+                if verdict == "ko":
+                    print(f"{RED}  🚩 Mauvais flag. Relis la sortie de ta commande.{RESET}")
+                    continue
             if word == "reset":
                 print(f"  {DIM}⚙  Labo remis à neuf...{RESET}")
                 lab.reset()
@@ -424,9 +471,13 @@ def run_lab_mission(player, mission, spec):
 
             right_command = is_valid_answer(line, mission)
             if right_command and lab.check(output, code):
-                _complete(player, mission, already_done)
-                return _after_mission(player, mission)
-            if right_command:
+                if require_flag:
+                    print(f"{GREEN}  ✅ Commande réussie — le flag est dans la sortie. "
+                          f"{BOLD}Soumets-le pour valider{RESET}{GREEN} (tape-le directement).{RESET}")
+                else:
+                    _complete(player, mission, already_done)
+                    return _after_mission(player, mission)
+            elif right_command:
                 print(f"{YELLOW}  ↳ Bonne commande, mais l'objectif n'est pas encore atteint "
                       f"(mauvais fichier ? mauvais dossier ?). Tape 'objectif' ou 'hint'.{RESET}")
             elif same_tool(line, mission):

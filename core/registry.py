@@ -77,34 +77,55 @@ PROGRESSION_ORDER = [
 # Catégories débloquées dès le départ
 STARTER_CATEGORIES = ["linux_navigation", "linux_files"]
 
-# Déblocages progressifs : compléter X% d'une catégorie débloque la suivante
-# Format : { "cat_id": ("cat_à_débloquer", pourcentage_requis) }
+# Déblocages en arbre : compléter X % d'une catégorie en ouvre d'autres.
+# Au lieu d'une file unique (il fallait traverser ~15 catégories avant d'atteindre
+# Forensics/Reverse), le tronc Linux de base ouvre vite plusieurs branches :
+#   · offensive   : Réseau → Nmap → Web → Mots de passe → OSINT → Exploitation → Post-expl → AD
+#   · forensics   : Forensics → Reverse → PWN → Jail
+#   · sysadmin    : Processus → Archives → Système → Scripting → Avancé → Crypto → WiFi
+# Format : { "cat_id": [("cat_à_débloquer", pourcentage_requis), ...] }
 UNLOCK_RULES = {
-    "linux_navigation":  [("linux_files", 50),    ("linux_text", 100)],
-    "linux_files":       [("linux_text", 50),      ("linux_permissions", 100)],
-    "linux_text":        [("linux_permissions", 50), ("linux_processes", 100)],
-    "linux_permissions": [("linux_processes", 50), ("linux_network", 100)],
-    "linux_processes":   [("linux_network", 50),   ("linux_archives", 100)],
-    "linux_network":     [("linux_archives", 50),  ("linux_system", 100)],
-    "linux_archives":    [("linux_system", 50),    ("linux_scripting", 100)],
-    "linux_system":      [("linux_scripting", 50), ("linux_advanced", 100)],
-    "linux_scripting":   [("linux_advanced", 50),  ("nmap_mastery", 100)],
-    "linux_advanced":    [("nmap_mastery", 50),    ("web_recon", 100)],
-    "nmap_mastery":      [("web_recon", 50),       ("osint_tools", 100)],
-    "web_recon":         [("password_attacks", 50), ("web_attacks", 100)],
-    "password_attacks":  [("web_attacks", 50),     ("osint_tools", 100)],
-    "osint_tools":       [("web_attacks", 50),     ("exploitation_tools", 100)],
-    "web_attacks":       [("exploitation_tools", 50), ("post_exploitation", 100)],
-    "exploitation_tools":[("post_exploitation", 50), ("crypto_tools", 100)],
-    "post_exploitation": [("crypto_tools", 50),    ("forensics_tools", 100)],
-    "crypto_tools":      [("forensics_tools", 50), ("reverse_engineering", 100)],
-    "forensics_tools":   [("reverse_engineering", 50), ("pwn_tools", 100)],
-    "reverse_engineering":[("pwn_tools", 50),      ("network_attacks", 100)],
-    "pwn_tools":         [("network_attacks", 50), ("active_directory", 100)],
-    "network_attacks":   [("active_directory", 50), ("wifi_hacking", 100)],
-    "active_directory":  [("wifi_hacking", 50),    ("jail_utils", 100)],
-    "wifi_hacking":      [("jail_utils", 50)],
+    # — tronc Linux de base —
+    "linux_navigation":   [("linux_files", 50), ("linux_text", 100)],
+    "linux_files":        [("linux_permissions", 100)],
+    "linux_text":         [("linux_network", 50), ("forensics_tools", 100)],
+    "linux_permissions":  [("linux_processes", 50), ("reverse_engineering", 100)],
+    "linux_processes":    [("linux_archives", 100)],
+    "linux_archives":     [("linux_system", 100)],
+    "linux_system":       [("linux_scripting", 100)],
+    "linux_scripting":    [("linux_advanced", 100)],
+    "linux_advanced":     [("crypto_tools", 100)],
+    # — branche offensive (réseau) —
+    "linux_network":      [("nmap_mastery", 50), ("web_recon", 100)],
+    "nmap_mastery":       [("network_attacks", 100)],
+    "web_recon":          [("web_attacks", 100)],
+    "web_attacks":        [("password_attacks", 100)],
+    "password_attacks":   [("osint_tools", 100)],
+    "osint_tools":        [("exploitation_tools", 100)],
+    "exploitation_tools": [("post_exploitation", 100)],
+    "post_exploitation":  [("active_directory", 100)],
+    # — branche forensics / reverse —
+    "forensics_tools":    [("reverse_engineering", 100)],
+    "reverse_engineering":[("pwn_tools", 100)],
+    "pwn_tools":          [("jail_utils", 100)],
+    # — branche sysadmin / crypto —
+    "crypto_tools":       [("wifi_hacking", 100)],
 }
+
+
+def unlock_hint(cat_id):
+    """Phrase expliquant comment débloquer une catégorie verrouillée,
+    p. ex. « termine 50 % de Navigation ». None si rien ne la débloque."""
+    best = None
+    for src, rules in UNLOCK_RULES.items():
+        for (target, pct) in rules:
+            if target == cat_id and (best is None or pct < best[1]):
+                best = (src, pct)
+    if best is None:
+        return None
+    src_title = ALL_MISSIONS.get(best[0], {}).get("title", best[0])
+    verbe = "commence" if best[1] <= 50 else "termine"
+    return f"{verbe} {best[1]} % de {src_title}"
 
 
 def compute_unlocks(player_completed: list, current_unlocked: list) -> list:

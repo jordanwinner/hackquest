@@ -189,7 +189,7 @@ LABS = {
                "checks": [{"re": r"(?i)\bzip\b"}], "solution": "binwalk firmware.bin"},
     "for_03": {"cwd": "/home/hacker/forensics",
                "checks": [{"out": "FLAG{strings_dans_malware}"}], "solution": "strings malware.bin | grep FLAG"},
-    "for_05": {"cwd": "/home/hacker/forensics",
+    "for_05": {"cwd": "/home/hacker/forensics", "flag": "FLAG{steghide_extrait}",
                "checks": [{"test": "[ -f ~/forensics/message.txt ] && grep -q FLAG ~/forensics/message.txt"}],
                "solution": "steghide extract -sf secret.bmp -p hackquest"},
     "for_06": {"cwd": "/home/hacker/forensics",
