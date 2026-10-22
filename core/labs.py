@@ -203,6 +203,25 @@ LABS = {
                "checks": [{"out": "Backdoor_Detectee"}], "solution": "yara rules.yar suspect.exe"},
     "for_13": {"cwd": "/home/hacker/forensics",
                "checks": [{"re": r"\d\.\d\d bits"}], "solution": "entropy encrypted.bin"},
+
+    # ── Reverse engineering (binaire local) ──────────────────────────────
+    "rev_01": {"cwd": "/home/hacker/reverse",
+               "checks": [{"out": "NX"}], "solution": "checksec --file=crackme"},
+    "rev_02": {"cwd": "/home/hacker/reverse",
+               "checks": [{"out": "S3cr3t_P4ss_2026"}], "solution": "strings crackme"},
+    "rev_03": {"cwd": "/home/hacker/reverse",
+               "checks": [{"re": r"execve|openat|write"}], "solution": "strace ./crackme test"},
+    "rev_04": {"cwd": "/home/hacker/reverse",
+               "checks": [{"out": "strcmp"}], "solution": "ltrace ./crackme test"},
+    "rev_05": {"cwd": "/home/hacker/reverse",
+               "checks": [{"re": r"(?i)breakpoint"}],
+               "solution": "gdb -batch -ex 'break main' -ex run ./crackme"},
+
+    # ── Post-exploitation (locale) ───────────────────────────────────────
+    "postex_03": {"checks": [{"out": "backup-tool"}], "solution": "find / -perm -4000 2>/dev/null"},
+    "postex_04": {"checks": [{"out": "/opt/backup/run.sh"}], "solution": "crontab -l"},
+    "postex_05": {"env": {"DB_PASSWORD": "FLAG{creds_dans_env}"},
+                  "checks": [{"out": "FLAG{creds_dans_env}"}], "solution": "env | grep -i pass"},
 }
 
 # Indice contextuel affiché au début de chaque labo (où chercher)
@@ -225,4 +244,6 @@ WHERE = {
     "for_06": "forensics/disk.img", "for_07": "forensics/capture.pcap",
     "for_08": "forensics/capture.pcap", "for_12": "forensics/rules.yar + suspect.exe",
     "for_13": "forensics/encrypted.bin",
+    "rev_01": "reverse/crackme", "rev_02": "reverse/crackme", "rev_03": "reverse/crackme",
+    "rev_04": "reverse/crackme", "rev_05": "reverse/crackme",
 }

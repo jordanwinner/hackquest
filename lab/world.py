@@ -219,6 +219,16 @@ write(f"{H}/a_hasher.bin", b"contenu binaire a verifier\n")                     
 os.makedirs(f"{H}/exfil", exist_ok=True)
 write(f"{H}/exfil/creds.txt", "admin:FLAG{loot_synchronise}\n")                     # adv_11 : rsync (dossier exfil, pas loot qui sert à fil_08)
 
+# ── Reverse engineering ────────────────────────────────────────────────────
+os.makedirs(f"{H}/reverse", exist_ok=True)
+shutil.copy("/opt/crackme", f"{H}/reverse/crackme")                                # rev_01..05
+os.chmod(f"{H}/reverse/crackme", 0o755)
+
+# ── Post-exploitation ──────────────────────────────────────────────────────
+# postex_03 : SUID → backup-tool (déjà planté pour nav_11)
+# postex_04 : crontab → crontab de hacker (déjà planté pour sys_08)
+# postex_05 : credentials dans l'environnement → via la variable d'env du labo
+
 # ── Forensics ────────────────────────────────────────────────────────────
 os.makedirs(f"{H}/forensics", exist_ok=True)
 F = f"{H}/forensics"

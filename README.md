@@ -26,7 +26,7 @@ hackquest
 
 Les missions marquées **💻 labo** se jouent dans un **vrai shell**, sur `srv-target`, un faux serveur compromis rempli de logs, de fichiers cachés et de flags. Une mission n'est validée que si **le résultat est là** : flag affiché, fichier créé, bon dossier atteint…
 
-Toutes les missions **Linux locales** et la **forensics** ont un labo (navigation, fichiers, texte, permissions, processus, archives, système, scripting, avancé, forensics) — 105 missions dans le vrai shell. La forensics travaille sur de vrais fichiers plantés dans le serveur : image aux métadonnées cachées (exiftool), fichier embarqué (binwalk), stéganographie (steghide), carving (foremost), capture réseau (tshark), règle YARA, entropie… Les catégories qui ont besoin d'une cible réseau ou distante (Nmap, Web, OSINT, Active Directory…) restent en mode texte, puisque le labo n'a **pas de réseau** par choix de sécurité.
+Les missions **Linux locales**, la **forensics**, le **reverse engineering local** et la **post-exploitation locale** ont un labo — 113 missions dans le vrai shell. La forensics travaille sur de vrais fichiers plantés dans le serveur : image aux métadonnées cachées (exiftool), fichier embarqué (binwalk), stéganographie (steghide), carving (foremost), capture réseau (tshark), règle YARA, entropie, et un crackme à analyser (strings, strace, ltrace, gdb, checksec)… Les catégories qui ont besoin d'une cible réseau ou distante (Nmap, Web, OSINT, Active Directory…) restent en mode texte, puisque le labo n'a **pas de réseau** par choix de sécurité.
 
 - Il faut **Docker**. Sans Docker, ces missions se jouent en mode texte. Pour l'installer (Ubuntu/Debian/Kali) :
 

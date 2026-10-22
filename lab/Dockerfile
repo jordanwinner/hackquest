@@ -8,8 +8,10 @@ RUN apt-get update \
       procps psmisc tree file less xxd binutils plocate zip unzip bc \
       p7zip-full openssl rsync cron \
       libimage-exiftool-perl binwalk steghide foremost tshark yara \
+      strace ltrace gdb checksec \
  && rm -rf /var/lib/apt/lists/*
 
+COPY bin/crackme /opt/crackme
 COPY world.py /tmp/world.py
 RUN python3 /tmp/world.py && rm /tmp/world.py && updatedb
 
