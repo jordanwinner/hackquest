@@ -5,13 +5,55 @@ Le décor : srv-target, un serveur web compromis. Le joueur est l'utilisateur
 `hacker` et fouille le système. Chaque fichier sert à au moins une mission
 (voir core/labs.py) : si tu modifies une valeur ici, vérifie la mission associée.
 """
+import gzip
 import os
 import random
 import shutil
+import struct
 import subprocess
+import zipfile
+import zlib
 
 random.seed(1337)  # même monde à chaque construction
 H = "/home/hacker"
+
+
+# ── petits générateurs de fichiers (sans dépendance : utiles pour la forensics) ──
+def make_png(w, h, rgb=(70, 130, 180)):
+    """Un PNG RGB valide (signature + IHDR/IDAT/IEND), carvable par foremost."""
+    def chunk(typ, data):
+        body = typ + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xffffffff)
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    raw = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+def make_bmp(w, h):
+    """Un BMP 24 bits bruité : support de couverture pour steghide."""
+    rowsize = (w * 3 + 3) & ~3
+    pixels = bytearray()
+    for _ in range(h):
+        pixels += random.randbytes(w * 3) + b"\x00" * (rowsize - w * 3)
+    datasize = rowsize * h
+    hdr = b"BM" + struct.pack("<IHHI", 54 + datasize, 0, 0, 54)
+    dib = struct.pack("<IiiHHIIiiII", 40, w, h, 1, 24, 0, datasize, 2835, 2835, 0, 0)
+    return hdr + dib + bytes(pixels)
+
+
+def make_dns_pcap(qname):
+    """Une capture pcap d'une seule requête DNS (lisible par tshark, sans réseau)."""
+    labels = b"".join(bytes([len(p)]) + p.encode() for p in qname.split(".")) + b"\x00"
+    dns = struct.pack(">HHHHHH", 0x1337, 0x0100, 1, 0, 0, 0) + labels + struct.pack(">HH", 1, 1)
+    udp = struct.pack(">HHHH", 40000, 53, 8 + len(dns), 0) + dns
+    ip = struct.pack(">BBHHHBBH4s4s", 0x45, 0, 20 + len(udp), 0x1234, 0, 64, 17, 0,
+                     bytes([10, 0, 0, 77]), bytes([8, 8, 8, 8]))
+    eth = b"\x52\x54\x00\x12\x34\x56\x52\x54\x00\x65\x43\x21\x08\x00"
+    pkt = eth + ip + udp
+    gheader = struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1)
+    pheader = struct.pack("<IIII", 0, 0, len(pkt), len(pkt))
+    return gheader + pheader + pkt
 
 
 def sh(*cmd):
@@ -176,6 +218,64 @@ write(f"{H}/cibles.txt", lines(["10.0.0.1", "10.0.0.2", "10.0.0.3"]))           
 write(f"{H}/a_hasher.bin", b"contenu binaire a verifier\n")                        # adv_04 : md5sum/sha256sum
 os.makedirs(f"{H}/exfil", exist_ok=True)
 write(f"{H}/exfil/creds.txt", "admin:FLAG{loot_synchronise}\n")                     # adv_11 : rsync (dossier exfil, pas loot qui sert à fil_08)
+
+# ── Forensics ────────────────────────────────────────────────────────────
+os.makedirs(f"{H}/forensics", exist_ok=True)
+F = f"{H}/forensics"
+
+# for_01 : exiftool — métadonnées cachées dans une image
+write(f"{F}/photo.png", make_png(64, 64))
+subprocess.run(["exiftool", "-overwrite_original", "-Artist=admin_pirate",
+                "-Comment=FLAG{metadonnees_exif}", f"{F}/photo.png"],
+               check=True, stdout=subprocess.DEVNULL)
+
+# for_02 : binwalk — fichiers embarqués (un ZIP caché à la fin d'une image)
+buf = make_png(32, 32) + random.randbytes(200)
+zbuf = f"{F}/_hidden.zip"
+with zipfile.ZipFile(zbuf, "w") as z:
+    z.writestr("config_cache.txt", "FLAG{fichier_embarque}\n")
+with open(zbuf, "rb") as z:
+    buf += z.read()
+os.remove(zbuf)
+buf += gzip.compress(b"configuration secrete du firmware\n")
+write(f"{F}/firmware.bin", buf)
+
+# for_03 : strings — chaîne lisible dans un binaire
+with open("/usr/bin/true", "rb") as f:
+    write(f"{F}/malware.bin", f.read() + b"\x00C2_SERVER=185.220.101.42\x00"
+                              b"PASSWORD=FLAG{strings_dans_malware}\x00", 0o755)
+
+# for_05 : steghide — données cachées dans une image (phrase : hackquest)
+write(f"{F}/message.txt", "FLAG{steghide_extrait}\n")
+write(f"{F}/secret.bmp", make_bmp(200, 200))
+subprocess.run(["steghide", "embed", "-cf", f"{F}/secret.bmp", "-ef", f"{F}/message.txt",
+                "-p", "hackquest", "-q"], check=True)
+os.remove(f"{F}/message.txt")                                                      # seul le .bmp reste
+
+# for_06 : foremost — un PNG noyé dans une image disque, à récupérer
+write(f"{F}/disk.img", random.randbytes(100_000) + make_png(80, 80)
+                       + random.randbytes(50_000))
+
+# for_07 / for_08 : tshark — une requête DNS qui exfiltre un flag
+write(f"{F}/capture.pcap", make_dns_pcap("FLAG-exfiltration.evil.corp"))
+
+# for_12 : yara — règle de détection + fichier suspect
+write(f"{F}/rules.yar", 'rule Backdoor_Detectee {\n'
+                        '  strings:\n    $a = "backdoor_shell_2026"\n'
+                        '  condition:\n    $a\n}\n')
+write(f"{F}/suspect.exe", "programme anodin en apparence...\n"
+                          "backdoor_shell_2026 FLAG{yara_a_matche}\n")
+
+# for_13 : entropy — wrapper maison (pas d'outil standard « entropy »)
+write("/usr/local/bin/entropy", "#!/usr/bin/env python3\n"
+      "import sys, math, collections\n"
+      "for f in sys.argv[1:]:\n"
+      "    d = open(f, 'rb').read()\n"
+      "    if not d:\n        print(f'{f}: 0.00 bits/octet'); continue\n"
+      "    n = len(d); c = collections.Counter(d)\n"
+      "    e = -sum((v/n) * math.log2(v/n) for v in c.values())\n"
+      "    print(f'{f}: {e:.2f} bits/octet')\n", 0o755)
+write(f"{F}/encrypted.bin", random.randbytes(50_000))                              # entropie ~8
 
 sh("chown", "-R", "hacker:hacker", H)
 sh("chown", "hacker:hacker", "/usr/local/bin")                                     # fil_19 : ln -s dans /usr/local/bin

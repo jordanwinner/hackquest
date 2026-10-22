@@ -26,7 +26,7 @@ hackquest
 
 Les missions marquées **💻 labo** se jouent dans un **vrai shell**, sur `srv-target`, un faux serveur compromis rempli de logs, de fichiers cachés et de flags. Une mission n'est validée que si **le résultat est là** : flag affiché, fichier créé, bon dossier atteint…
 
-Toutes les missions **Linux locales** ont un labo (navigation, fichiers, texte, permissions, processus, archives, système, scripting, avancé). Les catégories qui ont besoin d'une cible réseau ou d'une cible distante (Nmap, Web, OSINT, Active Directory…) restent en mode texte, puisque le labo n'a **pas de réseau** par choix de sécurité.
+Toutes les missions **Linux locales** et la **forensics** ont un labo (navigation, fichiers, texte, permissions, processus, archives, système, scripting, avancé, forensics) — 105 missions dans le vrai shell. La forensics travaille sur de vrais fichiers plantés dans le serveur : image aux métadonnées cachées (exiftool), fichier embarqué (binwalk), stéganographie (steghide), carving (foremost), capture réseau (tshark), règle YARA, entropie… Les catégories qui ont besoin d'une cible réseau ou distante (Nmap, Web, OSINT, Active Directory…) restent en mode texte, puisque le labo n'a **pas de réseau** par choix de sécurité.
 
 - Il faut **Docker**. Sans Docker, ces missions se jouent en mode texte. Pour l'installer (Ubuntu/Debian/Kali) :
 
@@ -36,7 +36,7 @@ Toutes les missions **Linux locales** ont un labo (navigation, fichiers, texte, 
   ```
 
   Ensuite, **déconnecte-toi puis reconnecte-toi** pour que le groupe `docker` soit pris en compte. Pour vérifier : `docker run --rm hello-world`.
-- Le labo est construit automatiquement au premier lancement : ~300 Mo, une seule fois, connexion requise.
+- Le labo est construit automatiquement au premier lancement : ~600 Mo, une seule fois, connexion requise.
 - Chaque mission tourne dans un conteneur **sans réseau**, en utilisateur non-root, **détruit à la fin**. Tu peux tout casser sans risque.
 - Pour changer de mode : ⚙️ Paramètres → Bac à sable.
 
@@ -84,7 +84,7 @@ La progression est enregistrée dans `~/.hackquest_save.json`. Une copie de la v
 
 - Linux (Kali, Ubuntu, Debian...)
 - Python 3.8+
-- Optionnel : Docker, pour les missions 💻 (voir plus haut). Un labo utilise ~1 Mo de RAM au repos (256 Mo au maximum) et l'image occupe ~220 Mo.
+- Optionnel : Docker, pour les missions 💻 (voir plus haut). Un labo utilise ~1 Mo de RAM au repos (256 Mo au maximum) et l'image occupe ~600 Mo (outils de forensics inclus).
 
 ## Mettre à jour
 

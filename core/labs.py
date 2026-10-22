@@ -181,6 +181,28 @@ LABS = {
     "adv_08": {"checks": [{"re": r"^\d"}], "solution": "echo '1500000 / 1024 / 1024' | bc"},
     "adv_11": {"checks": [{"test": "find /tmp -path '*creds.txt' -cnewer /run/hq/start | grep -q ."}],
                "solution": "rsync -av exfil/ /tmp/exfil_copie/"},
+
+    # ── Forensics (fichiers locaux, sans réseau) ─────────────────────────
+    "for_01": {"cwd": "/home/hacker/forensics",
+               "checks": [{"out": "FLAG{metadonnees_exif}"}], "solution": "exiftool photo.png"},
+    "for_02": {"cwd": "/home/hacker/forensics",
+               "checks": [{"re": r"(?i)\bzip\b"}], "solution": "binwalk firmware.bin"},
+    "for_03": {"cwd": "/home/hacker/forensics",
+               "checks": [{"out": "FLAG{strings_dans_malware}"}], "solution": "strings malware.bin | grep FLAG"},
+    "for_05": {"cwd": "/home/hacker/forensics",
+               "checks": [{"test": "[ -f ~/forensics/message.txt ] && grep -q FLAG ~/forensics/message.txt"}],
+               "solution": "steghide extract -sf secret.bmp -p hackquest"},
+    "for_06": {"cwd": "/home/hacker/forensics",
+               "checks": [{"test": "find ~/forensics /tmp -name '*.png' -cnewer /run/hq/start 2>/dev/null | grep -q ."}],
+               "solution": "foremost -i disk.img -o recup"},
+    "for_07": {"cwd": "/home/hacker/forensics",
+               "checks": [{"out": "query"}], "solution": "tshark -r capture.pcap"},
+    "for_08": {"cwd": "/home/hacker/forensics",
+               "checks": [{"out": "FLAG-exfiltration"}], "solution": "tshark -r capture.pcap"},
+    "for_12": {"cwd": "/home/hacker/forensics",
+               "checks": [{"out": "Backdoor_Detectee"}], "solution": "yara rules.yar suspect.exe"},
+    "for_13": {"cwd": "/home/hacker/forensics",
+               "checks": [{"re": r"\d\.\d\d bits"}], "solution": "entropy encrypted.bin"},
 }
 
 # Indice contextuel affiché au début de chaque labo (où chercher)
@@ -198,4 +220,9 @@ WHERE = {
     "arc_05": "access.log.saved.gz", "sys_02": "/var/data", "sys_08": "crontab de hacker",
     "sys_14": "/etc/shadow.bak", "scr_05": "cibles.txt", "scr_13": "scan.sh",
     "adv_04": "a_hasher.bin", "adv_11": "exfil/",
+    "for_01": "forensics/photo.png", "for_02": "forensics/firmware.bin",
+    "for_03": "forensics/malware.bin", "for_05": "forensics/secret.bmp (phrase : hackquest)",
+    "for_06": "forensics/disk.img", "for_07": "forensics/capture.pcap",
+    "for_08": "forensics/capture.pcap", "for_12": "forensics/rules.yar + suspect.exe",
+    "for_13": "forensics/encrypted.bin",
 }
