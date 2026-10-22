@@ -12,6 +12,7 @@ Les missions avancées se jouent dans un **vrai shell**, sur un faux serveur com
 ![Linux](https://img.shields.io/badge/Linux-terminal-FCC624?logo=linux&logoColor=black)
 ![Missions](https://img.shields.io/badge/missions-318-brightgreen)
 ![Vrai shell](https://img.shields.io/badge/vrai%20shell-113%20labos-E8513F)
+![License](https://img.shields.io/badge/licence-MIT-green)
 
 <img src="docs/images/menu.png" width="720" alt="Menu principal de HackQuest">
 
@@ -158,6 +159,12 @@ curl -sSL https://raw.githubusercontent.com/jordanwinner/hackquest/master/instal
 ./uninstall.sh            # garde ta progression
 ./uninstall.sh --purge    # efface aussi la progression
 ```
+
+---
+
+## 📄 Licence
+
+Distribué sous licence **MIT** — © 2026 Jordan Winner. Tu peux l'utiliser, le modifier et le partager librement ; garde juste la mention de licence. Voir [`LICENSE`](LICENSE).
 
 ---
 
