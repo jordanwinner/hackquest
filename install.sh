@@ -79,6 +79,20 @@ else
     echo -e "  ${GREEN}✅ Fichiers prêts${NC}"
 fi
 
+# ── fzf (optionnel) : recherche floue des missions avec aperçu
+if command -v fzf &>/dev/null; then
+    echo -e "  ${GREEN}✅ fzf présent (recherche floue des missions activée)${NC}"
+elif [ "$HAS_APT" = 1 ]; then
+    echo -e "  ⚙  fzf manquant : installation (recherche floue des missions)..."
+    if apt_install fzf; then
+        echo -e "  ${GREEN}✅ fzf installé${NC}"
+    else
+        echo -e "  ${DIM:-}ℹ  fzf non installé — le menu classique sera utilisé.${NC}"
+    fi
+else
+    echo -e "  ℹ  fzf absent — menu classique (installe fzf pour la recherche floue)."
+fi
+
 # ── Créer la commande hackquest dans ~/.local/bin
 mkdir -p "$BIN_DIR"
 chmod +x "$GAME_DIR/hackquest"

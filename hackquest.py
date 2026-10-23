@@ -56,21 +56,33 @@ def main_menu(player):
         choice = prompt("Choix")
 
         if choice == "1":
-            result = show_categories(player)
-            if result:
-                cat_id, cat_data = result
-                # enchaîne les missions : après une réussite, on peut passer
-                # directement à la suivante sans repasser par le menu principal
-                action = show_missions(player, cat_id, cat_data)
-                while action and action != "menu":
+            from core.fzf import fzf_available, fuzzy_pick_mission
+            if fzf_available() and getattr(player, "fuzzy", True):
+                # recherche floue parmi toutes les missions débloquées (aperçu à droite)
+                m = fuzzy_pick_mission(player)
+                while m:
+                    action = run_mission(player, m)
                     if action == "list":
-                        action = show_missions(player, cat_id, cat_data)
+                        m = fuzzy_pick_mission(player)
+                    elif action and action != "menu":
+                        m = action           # enchaîne la mission suivante
                     else:
-                        # la mission suivante peut être dans la catégorie d'après :
-                        # la liste à réafficher ensuite est celle de cette catégorie
-                        cat_id = _category_of(action["id"]) or cat_id
-                        cat_data = MISSIONS[cat_id]
-                        action = run_mission(player, action)
+                        m = None
+            else:
+                result = show_categories(player)
+                if result:
+                    cat_id, cat_data = result
+                    # enchaîne les missions : après une réussite, on peut passer
+                    # directement à la suivante sans repasser par le menu principal
+                    action = show_missions(player, cat_id, cat_data)
+                    while action and action != "menu":
+                        if action == "list":
+                            action = show_missions(player, cat_id, cat_data)
+                        else:
+                            # la mission suivante peut être dans la catégorie d'après
+                            cat_id = _category_of(action["id"]) or cat_id
+                            cat_data = MISSIONS[cat_id]
+                            action = run_mission(player, action)
 
         elif choice == "2":
             play_campaign(player)
@@ -323,10 +335,19 @@ def show_settings(player):
     print(f"{BOLD}  ⚙️  PARAMÈTRES{RESET}\n")
     print(f"  Nom actuel : {CYAN}{player.name}{RESET}")
     state = f"{GREEN}activé{RESET}" if player.sandbox else f"{DIM}désactivé (mode texte){RESET}"
-    print(f"  Bac à sable 💻 : {state}\n")
+    print(f"  Bac à sable 💻 : {state}")
+    from core.fzf import fzf_available
+    if fzf_available():
+        fstate = f"{GREEN}activé{RESET}" if getattr(player, "fuzzy", True) else f"{DIM}désactivé (menu classique){RESET}"
+        print(f"  Recherche floue (fzf) : {fstate}")
+    else:
+        print(f"  Recherche floue (fzf) : {DIM}fzf non installé — menu classique{RESET}")
+    print()
     print(f"  {CYAN}[1]{RESET} Changer de nom")
     print(f"  {RED}[2]{RESET} Réinitialiser la progression")
     print(f"  {CYAN}[3]{RESET} {'Désactiver' if player.sandbox else 'Activer'} le bac à sable")
+    if fzf_available():
+        print(f"  {CYAN}[4]{RESET} {'Désactiver' if getattr(player, 'fuzzy', True) else 'Activer'} la recherche floue (fzf)")
     print(f"  {DIM}[0]{RESET} Retour\n")
 
     choice = prompt("Choix")
@@ -356,6 +377,13 @@ def show_settings(player):
         player.save()
         success("Bac à sable " + ("activé : les missions 💻 se jouent dans un vrai shell." if player.sandbox
                                   else "désactivé : toutes les missions se jouent en mode texte."))
+        press_enter()
+
+    elif choice == "4" and fzf_available():
+        player.fuzzy = not getattr(player, "fuzzy", True)
+        player.save()
+        success("Recherche floue " + ("activée : « Jouer » ouvre le sélecteur fzf." if player.fuzzy
+                                       else "désactivée : « Jouer » utilise le menu classique."))
         press_enter()
 
 

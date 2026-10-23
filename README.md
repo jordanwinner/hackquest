@@ -65,6 +65,7 @@ Sans Docker, le jeu fonctionne quand même : ces missions passent en **mode text
 - **145 missions dans un vrai shell** : tes commandes s'exécutent réellement, la validation se fait sur le résultat.
 - **Progression & grades** : XP, 8 rangs (de *Newbie* à *Legend*), catégories qui se débloquent au fil de l'eau.
 - **Enchaînement fluide** : après une réussite, tu passes à la mission suivante ou au niveau suivant sans repasser par le menu.
+- **Recherche floue (fzf)** : si `fzf` est installé, « Jouer » ouvre un sélecteur instantané — tape quelques lettres pour retrouver n'importe quelle mission parmi les débloquées, avec un **aperçu** (histoire + objectif + XP) à droite. Désactivable dans ⚙️ Paramètres ; sans fzf, le menu classique reste.
 - **Indices** (`hint`), **cheatsheet** intégrée, **carte de progression**, **statistiques** détaillées.
 - **Sans risque** : chaque labo tourne dans un conteneur isolé, sans réseau, en utilisateur non-root — tu peux tout casser.
 - **Reprend où tu t'es arrêté** : sauvegarde automatique et robuste (écriture atomique + copie de secours).
